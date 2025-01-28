@@ -1,15 +1,19 @@
 #! /bin/sh --
 # by pts@fazekas.hu at Sat Jan 25 00:54:21 CET 2025
 set -ex
+
 test "$0" = "${0%/*}" || cd "${0%/*}"
 export LC_ALL=C  # For deterministic output. Typically not needed. Is it too late for Perl?
 export TZ=GMT  # For deterministic output. Typically not needed. Perl respects it immediately.
-unset INCLUDE WATCOM WLINK WLINK_LNK LIB LIBDIR  # To prevent wlink(1) from searching in other directories.
+
+test "$ZSH_VERSION" && set -y 2>/dev/null  # SH_WORD_SPLIT for zsh(1). It's an invalid option in bash(1), and it's harmful (prevents echo) in ash(1).
 
 nasm=tools/nasm-0.98.39.upx
 perl=tools/miniperl-5.004.04.upx
 wlink=tools/wlink-ow1.8.upx
 elfxfix=tools/elfxfix
+
+unset INCLUDE WATCOM WLINK WLINK_LNK LIB LIBDIR  # To prevent wlink(1) from searching in other directories.
 
 test "$(sha256sum apack.exe)" = "c26f95ef305399bcd9ba659cc5e6ff65bf17dedc360aa80a94b4084a30f9de60  apack.exe"
 
