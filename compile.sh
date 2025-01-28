@@ -20,6 +20,22 @@ wlink=tools/wlink-ow2023-03-04.upx
 wlink=tools/wlink-ow1.8.upx
 unset INCLUDE WATCOM WLINK WLINK_LNK LIB LIBDIR  # To prevent wlink(1) from searching in other directories.
 
+if ! test -f apack.exe; then
+  if ! test -f apack-1.00.zip; then
+    # Try to find the non-BusyBox wget(1) on PATH.
+    wget="$(set +ex; IFS=: ; for dir in ${OPATH:-$PATH}; do p="$dir/wget" && test -f "$p" && test -x "$p" && printf '%s' "$p" && break; done; :)"
+    wget_flags="-nv -O"
+    if test -z "$wget"; then  # If wget(1) not found, try curl(1).
+      wget="$(set +ex; IFS=: ; for dir in ${OPATH:-$PATH}; do p="$dir/curl" && test -f "$p" && test -x "$p" && printf '%s' "$p" && break; done; :)"
+      wget_flags=-sSLfo
+    fi
+    "$wget" $wget_flags apack-1.00.zip.tmp https://web.archive.org/web/20240424153415/https://ibsensoftware.com/files/apack-1.00.zip
+    mv apack-1.00.zip.tmp apack-1.00.zip
+  fi
+  test "$(sha256sum apack-1.00.zip)" = "9210882561bc4e159b9f811171ac15418a6c765b8d87bc969139de9c328acdd5  apack-1.00.zip"
+  unzip apack-1.00.zip apack.exe
+fi
+
 test "$(sha256sum apack.exe)" = "c26f95ef305399bcd9ba659cc5e6ff65bf17dedc360aa80a94b4084a30f9de60  apack.exe"
 
 "$nasm" -O0 -w+orphan-labels -f bin -o decimg decimg.nasm
