@@ -1,0 +1,318 @@
+; comments by pts@fazekas.hu at Fri Jan 24 20:43:47 CET 2025
+;
+; Compressed by the 32LiTE executable compressor.
+
+; $ wdump -q -a apack.exe >apack.wdump
+; $ ndisasm -b 32 -e 0x2e50 apack.exe >apack.ndisasm
+; $ ndisasm -b 32 -e "$(perl -e 'print(0x2e50+0x46+0x8281)')" -o "$(perl -e 'print(0x46+0x8281)')" apack.exe >apack_o1d.ndisasm  # Useless.
+;
+; Object 2 (of virtual memory size 0x1000) is the stack.
+;
+
+; --- Entry point, copier.
+
+entry:
+
+00000000  FC                cld
+00000001  B857415443        mov eax,0x43544157  ; 'WATC'. Part of the 'WATCOM' signature.
+00000006  4F                dec edi  ; 'OM'.
+00000007  4D                dec ebp
+00000008  06                push es  ; Save original ES. Part of some PMODE/W ABI.
+00000009  1E                push ds  ; DS seems to contain the flat segment where this program is already loaded.
+0000000A  07                pop es  ; DS := ES.
+0000000B  33DB              xor ebx,ebx
+0000000D  66B98585          mov cx,0x8585  ; BX:CX := size of block in bytes.
+00000011  66B80105          mov ax,0x501  ; DPMI API allocate memory block. https://www.delorie.com/djgpp/doc/dpmi/api/310501.html
+00000015  CD31              int 0x31  ; DPMI API allocate memory block. Returns BX:CX: allocated linear address. SI:DI: memory block handle.
+00000017  7304              jnc 0x1d
+00000019  B44C              mov ah,0x4c
+0000001B  CD21              int 0x21
+0000001D  56                push esi  ; High word of DPMI memory handle.
+0000001E  57                push edi  ; Low  word of DPMI memory handle.
+0000001F  89DF              mov edi,ebx
+00000021  C1E710            shl edi,byte 0x10
+00000024  6689CF            mov di,cx  ; EDI := linear address of memory block: dst.
+00000027  E800000000        call 0x2c
+
+callbase:
+
+0000002C  5E                pop esi  ; ESI := address of callbase.
+0000002D  8D8781820000      lea eax,[edi+decompress-cdata]  ; 0x8281. EAX := dst+decompress-cdata.
+00000033  50                push eax  ; dst+decompress-cdata.
+00000034  83EE2C            sub esi,byte callbase-entry  ; 0x2c.  ; ESI := address of entry.
+00000037  56                push esi  ; entry.
+00000038  83C646            add esi,byte cdata-entry  ; 0x46.  ; ESI := address of cdata.
+0000003B  57                push edi  ; dst.
+0000003C  B9EB200000        mov ecx,(decompress_end-cdata+3)>>2 ; 0x20eb == ((0x83a9+3)>>2). ECX := 0x83ac>>4 (byte size).
+00000041  F3A5              rep movsd  ; Copy from cdata to dst.
+00000043  5E                pop esi  ; ESI := dst. Contains a copy of cdata...decompress_end.
+00000044  5F                pop edi  ; EDI := entry.
+00000045  C3                ret  ; Jump to dst+decompress-cdata, code at `decompress:' below.
+
+; --- Compressed data.
+
+cdata:  ; Compressed data.
+
+00000046  CC14EBFD9001...   db 0xcc, 0x14, 0xeb, 0xfd, 0x90, 0x01, ...
+
+; --- Decompressor.
+
+decompress:  ; In-memory decompressor code. Decompresses byte stream from ESI to EDI, and then jumps to the uncompressed stream.
+
+; This code resembles, but doesn't exactly match src/32bit/depack.asm in
+; https://web.archive.org/web/20240424153415/https://ibsensoftware.com/files/aPLib-1.1.1.zip
+
+
+000082C7  57                push edi  ; Save entry value.
+000082C8  B280              mov dl,0x80  ; No bits available.
+000082CA  31DB              xor ebx,ebx
+
+literal:
+
+000082CC  A4                movsb
+000082CD  B302              mov bl,0x2
+
+nexttag:
+
+000082CF  E864000000        call 0x338  ; getbit.
+000082D4  73F6              jnc 0x82cc
+000082D6  31C9              xor ecx,ecx
+000082D8  E85B000000        call 0x338  ; getbit.
+000082DD  731C              jnc 0x82fb
+000082DF  31C0              xor eax,eax
+000082E1  E852000000        call 0x338  ; getbit.
+000082E6  736C              jnc 0x8354
+000082E8  B302              mov bl,0x2
+000082EA  41                inc ecx
+000082EB  B010              mov al,0x10
+
+nexttag.getmorebits:
+
+000082ED  E846000000        call 0x338  ; getbit.
+000082F2  10C0              adc al,al
+000082F4  73F7              jnc 0x82ed
+000082F6  7536              jnz 0x832e
+000082F8  AA                stosb
+000082F9  EBD4              jmp short 0x82cf
+
+codepair:
+
+000082FB  E844000000        call 0x8344
+00008300  29D9              sub ecx,ebx
+00008302  7507              jnz 0x830b
+00008304  E839000000        call 0x8342
+00008309  EB1F              jmp short 0x832a
+
+; aPLib-1.1.1 src/32bit/depack.asm has `shortmatch' here, but we have it later.
+normalcodepair:
+
+0000830B  91                xchg eax,ecx
+0000830C  48                dec eax
+0000830D  C1E008            shl eax,byte 0x8
+00008310  AC                lodsb
+00008311  E82C000000        call 0x8342
+00008316  3D007D0000        cmp eax,0x7d00
+0000831B  730A              jnc 0x8327
+0000831D  80FC05            cmp ah,0x5
+00008320  7306              jnc 0x8328
+00008322  83F87F            cmp eax,byte +0x7f
+00008325  7702              ja 0x8329
+
+domatch_with_2inc:
+
+00008327  41                inc ecx
+
+domatch_with_inc:
+
+00008328  41                inc ecx
+
+domatch_new_lastpos:
+
+00008329  95                xchg eax,ebp
+0000832A  89E8              mov eax,ebp
+0000832C  B301              mov bl,0x1
+
+domatch:
+
+0000832E  56                push esi
+0000832F  89FE              mov esi,edi
+00008331  29C6              sub esi,eax
+00008333  F3A4              rep movsb
+00008335  5E                pop esi
+00008336  EB97              jmp short 0x82cf
+
+getbit:
+
+00008338  00D2              add dl,dl
+0000833A  7505              jnz 0x8341
+0000833C  8A16              mov dl,[esi]
+0000833E  46                inc esi
+0000833F  10D2              adc dl,dl
+
+getbit.stillibtsleft:
+
+00008341  C3                ret
+
+getgamma:
+
+00008342  31C9              xor ecx,ecx
+
+getgamma_no_ecx:
+
+00008344  41                inc ecx
+
+getgamma_no_ecx.getgammaloop:
+
+00008345  E8EEFFFFFF        call 0x338  ; getbit.
+0000834A  11C9              adc ecx,ecx
+0000834C  E8E7FFFFFF        call 0x338  ; getbit.
+00008351  72F2              jc 0x8345
+00008353  C3                ret
+
+shortmatch:
+
+00008354  AC                lodsb
+00008355  D1E8              shr eax,1
+00008357  7404              jz 0x835d  ; donedpacking.
+00008359  11C9              adc ecx,ecx
+0000835B  EBCA              jmp short 0x8327
+
+donedepacking:  ; This is near the end of aPLib-1.1.1 src/32bit/depack.asm .
+
+filter:  ; We do some post-decompression filtering. This was useful to make the code more compressible.
+
+0000835D  5B                pop ebx  ; EBX := entry value.
+0000835E  53                push ebx
+0000835F  8DBB99000000      lea edi,[ebx+0x99]  ; (This could have contained a displacement as a single byte.)
+
+filter_base:
+
+00008365  F7DB              neg ebx
+00008367  B96B010100        mov ecx,0x1016b
+0000836C  E916000000        jmp 0x8387  ; find_next_call.  (This could have been a `jmp short').
+
+found_call:
+
+00008371  803F07            cmp byte [edi],0x7
+00008374  7511              jnz 0x8387
+00008376  8D141F            lea edx,[edi+ebx]
+00008379  8B07              mov eax,[edi]
+0000837B  66C1E808          shr ax,byte 0x8
+0000837F  C1C810            ror eax,byte 0x10
+00008382  86E0              xchg ah,al
+00008384  29D0              sub eax,edx
+00008386  AB                stosd
+
+find_next_call:
+
+00008387  B0E8              mov al,0xe8  ; This is the opcode of the call instruction.
+00008389  F2AE              repne scasb
+0000838B  74E4              jz 0x8371  ; found_call.
+
+relocate_init:
+
+uncompressed_image_size equ 0x11d08
+bss_size equ 0x512f8
+relocation_cout equ 0xef0
+uncompressed_entry_ofs equ 0x10ff9
+
+0000838D  5F                pop edi  ; EDI := entry value.
+0000838E  8DB7081D0100      lea esi,[edi+uncompressed_image_size]  ; 0x11d08. Offset of relocations in the uncompressed data.
+00008394  8BDF              mov ebx,edi  ; EBX := entry value.
+00008396  B9F00E0000        mov ecx,relocation_count
+0000839B  31D2              xor edx,edx
+
+relocate_next:
+
+0000839D  31C0              xor eax,eax
+0000839F  AC                lodsb  ; Process 1 byte of relocation data.
+000083A0  3C03              cmp al,0x3
+000083A2  771F              ja 0x83c3
+000083A4  3C00              cmp al,0x0
+000083A6  7512              jnz 0x83ba
+000083A8  83C304            add ebx,byte +0x4
+
+000083AB  8A03              mov al,[ebx]
+000083AD  43                inc ebx
+000083AE  3C05              cmp al,0x5
+000083B0  7413              je 0x83c5
+000083B2  24FC              and al,0xfc
+000083B4  3CA0              cmp al,0xa0
+000083B6  75F3              jne 0x83ab
+000083B8  EB0B              jmp short 0x83c5
+
+000083BA  92                xchg eax,edx
+000083BB  42                inc edx
+000083BC  C1E008            shl eax,byte 0x8
+000083BF  AC                lodsb  ; Process 1 byte of relocation data.
+000083C0  4A                dec edx
+000083C1  75F9              jnz 0x83bc
+
+000083C3  01C3              add ebx,eax
+
+000083C5  013B              add [ebx],edi  ; Do a single relocation.
+000083C7  E2D4              loop 0x839d  ; relocate_next.
+
+init_bss_and_start:
+
+000083C9  81C7081D0100      add edi,uncompressed_image_size  ; 0x11d08. EDI := entry+uncompressed_image_size.
+000083CF  B9BE440100        mov ecx,bss_size>>2  ; (0x512f8>>2) == 0x144be. Total: uncompressed_image_size+bss_size == 0x63000, same as the virtual memory size of LE object 1: 0x63000.
+000083D4  31C0              xor eax,eax
+000083D6  F3AB              rep stosd  ; Initialize .bss with zero bytes.
+000083D8  97                xchg eax,edi  ; EAX := entry+uncompressed_image_size+bss_size.
+000083D9  5F                pop edi  ; EDI := low  word of DPMI memory handle.
+000083DA  5E                pop esi  ; ESI := high word of DPMI memory handle.
+000083DB  07                pop es  ; Restore original ES.
+000083DC  FA                cli
+000083DD  8DA020F8FFFF      lea esp,[eax-0x7e0]  ; ESP := entry+uncompressed_image_size+bss_size-0x7e0. Why do we subtract the 0x7e0? Is it some kind of LE (Linear Executable) page alignment artifact?
+000083E3  FB                sti
+000083E4  05F9DFFAFF        add eax,-0x52007  ; 0xfffadff9. EAX := entry+uncompressed_image_size+bss_size-0x52007 == entry+0x11d08+0x512f8-0x52007  == entry+0x10ff9 == entry+uncompressed_entry_ofs.
+000083E9  50                push eax
+000083EA  66B80205          mov ax,0x502  ; DPMI API free memory block. https://www.delorie.com/djgpp/doc/dpmi/api/310501.html . SI:DI is the memory block handle.
+000083EE  C3                ret  ; Jump to the program entry point.
+
+; Code at uncompressed_entry:
+;
+;00010FF9  CD31              int 0x31
+;00010FFB  E9B0C0FFFF        jmp 0xd0b0  ; Jump to the real entry point of the uncompressed program.
+;00011000  01010100          db 1, 1, 1, 0
+;00011004  ...               db 'aPACK v1.00', 0
+;00011010  ...               db 13, 10, 13, 10, 'Compiled on Jun  1 2009 at 15:08:27.', 13, 10, 13, 10, 0
+;                            db 0, 0, 0, 'Not enough memory to allocate file structures', 0, 0, 0
+;                            db 'Floating-point support not loaded', 0, 0, 0
+;                            db '0123456789abcdefghijklmnopqrstuvwxyz', 0, 0, 0, 0
+;                            db 'Unable to allocate real mode selector', 0
+;                            db 'Unable to set limit of real mode selector', 0
+;0001110C  00000000          dd 0
+;00011110
+;...
+
+; Code at the real entry point:
+;
+;0000D0B0  EB60              jmp short 0xd112
+;0000D0B2  ...               db 'Open WATCOM C/C++32 Run-Time system. Portions Copyright (C) Sybase, Inc. 1988-2002.'
+;0000D104  8D4000C784        db 0x8d, 0x40, 0, 0xc7, 0x84
+;0000D10A  7000              db 'p', 0
+;0000D10C  636F6E00          db 'con', 0
+;0000D110  0D0A              db 13, 10
+;0000D112  FB                sti
+;0000D113  83E4FC            and esp,byte -0x4
+;0000D116  8BDC              mov ebx,esp
+;0000D118  891DC0A07100      mov [dword 0x71a0c0],ebx
+;0000D11E  891DACA07100      mov [dword 0x71a0ac],ebx
+;0000D124  66B82400          mov ax,0x24
+;0000D128  66A3B8A07100      mov [0x71a0b8],ax
+;0000D12E  BB52414850        mov ebx,0x50484152
+;0000D133  2BC0              sub eax,eax
+;0000D135  B430              mov ah,0x30  ; DOS syscall: Get DOS version number.
+;0000D137  CD21              int 0x21  ; DOS syscall: Get DOS version number.
+
+decompress_end:
+
+; --- End.
+
+end:
+
+000083EF
+
+; __END__
