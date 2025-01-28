@@ -20,12 +20,11 @@
 ; * Enabled command-line flag -q even for non-registered.
 ; * Added command-line flag -r to simulate registered behavior (it produces different output). This works only at the beginning (argv[1]).
 ; * Written libc for the Linux i386 port. The only non-syscall was printf(1), which was implemented tailor-made for aPACK.
-; * !! Make it reentrant: run multiple copies (with different output filenames) in the same directory.
+; * !! Make it reentrant: run multiple copies (with different output filenames) in the same directory; modify tmp filename (APACKTMP.$$$) to something PID-related etc.
 ; * !! Write libc for T_DOS32, drop the OpenWatcom clib3rdos.lib.
 ; * !! After T_DOS32 is finished, port it to OIX (their ABIs are similar). Use `nasm -f elf' and then elf2oix.pl.
 ; * !! Merge the T_DOS32 .exe to the T_WIN32 .exe. Maybe do it by porting it to OIX.
 ; * !! Is packing data ever used?
-; * !! Remove the \007 in ERR: message.
 ; * !! Some functions replaced with shims: get_internal_error_code_ptr. !! What does this mean?
 ; * !! Some functions replaced with shims: libcu_dos_getftime, libcu_dos_setftime. !! What does this mean?
 ; * !! deduplicate string literals (*_0, *_1 etc.)
@@ -33,11 +32,11 @@
 ; * !! doc: DOSBox or mwperun.exe (not OpenWatcom libc) prints \r incorrectly
 ; * !! file date and time for Linux i386
 ; * !! file date and time for Win32
-; * !! \n --> \r\n on stdout printf (on Win32, but that's automatic with OpenWatcom libc)
-; * !! get rid of OpenWatcom libc library clib3rnt.lib functions: close_ remove_ exit_ open_ lseek_ filelength_ read_ rename_ malloc_ write_
-; * !! use the NASM import directive instead of OpenWatcom kernel32.lib (there is no automatic dependency discovery)
+; * !! get rid of OpenWatcom libc library apackdos.lib functions: close_ remove_ exit_ open_ lseek_ filelength_ read_ rename_ malloc_ write_
 ; * !! get rid of wlink(1), generate Win32 executable with NASM only; this will be tricky without PE .reloc generation support in NASM; but we can use the decimg.nasm trick
-; * !! modify tmp filename (APACKTMP.$$$) to something PID-related etc.; at least document that it doesn't work in parallel
+; * later: port it to FreeBSD i386 and other i386 on other popular BSDs
+; * later: port it to macOS i386. The last release of macOS which supports i386 (*32-bit apps*) is macOS 10.14 Mojave released on 2018-09-24.
+; * write a (limited) lightweight i386 emulator in ANSI C, and run it the emulator.
 ;
 ; Memory map of apack.re32:
 ;
