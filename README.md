@@ -88,7 +88,7 @@ and 286) systems or 64-bit Intel (amd64) systems (such as macOS) or
 non-Intel architectures (such as ARM).
 
 The Linux *file* tool was used to detect the file format, revealing this: LE
-executable for MS-DOS, PMODE/W DOS extender, 32LiTE compressed. This hint
+executable for MS-DOS, PMODE/W DOS extender, 32LiTE compressed. This hints
 that the programming language is C, C++ and/or assembly, and it was compiled
 with Watcom or OpenWatcom.
 
@@ -99,8 +99,8 @@ engineering started by running the OpenWatcom v2 *wdump* tool to dump the
 file headers, and then running the NASM *ndisasm* disassembler to
 disassemble the relevant i386 parts (offsets and lengths reported by
 *wdump*). The disassembly contains no symbols or debug info. Then a manual
-* look was taken at the raw disassembly, slowly annotating it with comments
-* and adding symbols.
+look was taken at the raw disassembly, slowly annotating it with comments
+and adding symbols.
 
 The 32LiTE-compressed i386 program image consists of:
 
@@ -117,7 +117,7 @@ The 32LiTE-compressed i386 program image consists of:
 Call filtering is a size-preserving code transformation which makes the
 subsequent compression step produce shorter output. In the case of 32LiTE,
 the 32-bit offsets in the i386 *call* instructions are converted from
-relative to absolute, thus if a function is called from multiple location,
+relative to absolute, thus if a function is called from multiple locations,
 the call offsets will become identical, thus compression will find more
 repetitions.
 
@@ -130,6 +130,15 @@ by the author of aPACK and 32LiTE. In fact, it's almost identical to
 [aPLib-1.1.1.zip](https://web.archive.org/web/20240424153415/https://ibsensoftware.com/files/aPLib-1.1.1.zip).)
 However, the inverse of call filtering and relocation processing are
 additional components, which are not open sourced.
+
+The aPLib compression format is a variant of
+[LZSS](https://en.wikipedia.org/wiki/Lempel%E2%80%93Ziv%E2%80%93Storer%E2%80%93Szymanski),
+with a variable-length encoding for the distances and lengths. This encoding
+is fixed, i.e. not adaptive like the Huffman encoding in
+[Deflate](https://en.wikipedia.org/wiki/Deflate). For each item in the
+compressed stream, 1 distinction bit encodes whether it is a literal or a
+distance--length pair. These bits are grouped together, i.e. a single byte
+encodes 8 such distinction bits.
 
 Having relocations accompanying the code and the data makes it possible to
 load the program to any memory address. The simplest case when a relocation
@@ -218,8 +227,8 @@ assembly, first targeting Linux i386, and once done, separately targeting
 Win32.
 
 These were the original OpenWatcom libc functions: *\_cstart\_*,
-*printf\_*, *cprintf\_*, *kbhit\_*, *getch\_*,
-*close\_*, *exit\_*, *filelength\_*, *lseek\_*, malloc\_*, *open\_*, *read\_*,
+*printf\_*, *cprintf\_*, *kbhit\_*, *getch\_*, *close\_*, *exit\_*,
+*filelength\_*, *lseek\_*, *malloc\_*, *open\_*, *read\_*,
 *remove\_*, *rename\_*, *write\_*, *dos\_getftime\_*, *dos\_setftime\_*. The
 trailing underscore indicates the \_\_watcall calling convention (which
 passes the first few arguments in EAX, EDX, then EBX). All of them had been
