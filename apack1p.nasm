@@ -9466,20 +9466,10 @@ incbin 'apack.re32', 0xa778, 0x6  ; @loc_70A758+0x0
 dd count+0x0  ; @loc_70A758+0x6
 incbin 'apack.re32', 0xa782, 0xc  ; @loc_70A758+0xa
 dd skip_or_copy_char_dword+0x0  ; @loc_70A758+0x16
-incbin 'apack.re32', 0xa792, 2  ; @loc_70A758+0x1a
+db 0x90, 0x90  ; patch: Skip the comparison. ; @loc_70A758+0x1a
 db 0x90, 0xe9  ; patch: jnz near --> nop + jmp near
-incbin 'apack.re32', 0xa796, 0xc  ; @loc_70A758+0x1a+4
-dd aFileHasLuBytes+0x0  ; @loc_70A758+0x2a
-call libcu_cprintf  ; @loc_70A758+0x2e
-incbin 'apack.re32', 0xa7ab, 0x3  ; @loc_70A758+0x33
-loc_70A78E:  ; @_text+0xa78e
-times 5 nop  ; call libcu_getch  ; @loc_70A78E+0x0
-incbin 'apack.re32', 0xa7b3, 0xa  ; @loc_70A78E+0x5
-loc_70A79D:  ; @_text+0xa79d
-incbin 'apack.re32', 0xa7bd, 0x1  ; @loc_70A79D+0x0
-dd aLf+0x0  ; @loc_70A79D+0x1
-call libcu_printf  ; @loc_70A79D+0x5
-incbin 'apack.re32', 0xa7c7, 0x3  ; @loc_70A79D+0xa
+incbin 'apack.re32', 0xa796, 4  ; @loc_70A758+0x1a+4
+times 0xa7aa-0xa77a nop  ; patch: Remove unused code.
 loc_70A7AA:  ; @_text+0xa7aa
 incbin 'apack.re32', 0xa7ca, 0xb  ; @loc_70A7AA+0x0
 dd is_quiet+0x0  ; @loc_70A7AA+0xb
@@ -10007,20 +9997,10 @@ incbin 'apack.re32', 0xaf71, 0x6  ; @loc_70AF51+0x0
 dd count+0x0  ; @loc_70AF51+0x6
 incbin 'apack.re32', 0xaf7b, 0xc  ; @loc_70AF51+0xa
 dd skip_or_copy_char_dword+0x0  ; @loc_70AF51+0x16
-incbin 'apack.re32', 0xaf8b, 2  ; @loc_70AF51+0x1a
+db 0x90, 0x90  ; patch: Skip the comparison.  ; @loc_70AF51+0x1a
 db 0x90, 0xe9  ; patch: jnz near --> nop + jmp near
-incbin 'apack.re32', 0xaf91, 0xc  ; @loc_70AF51+0x1a+4
-dd aFileHasLuBytes+0x0  ; @loc_70AF51+0x2a
-call libcu_cprintf  ; @loc_70AF51+0x2e
-incbin 'apack.re32', 0xafa4, 0x3  ; @loc_70AF51+0x33
-loc_70AF87:  ; @_text+0xaf87
-times 5 nop  ; call libcu_getch  ; @loc_70AF87+0x0
-incbin 'apack.re32', 0xafac, 0xa  ; @loc_70AF87+0x5
-loc_70AF96:  ; @_text+0xaf96
-incbin 'apack.re32', 0xafb6, 0x1  ; @loc_70AF96+0x0
-dd aLf_2+0x0  ; @loc_70AF96+0x1
-call libcu_printf  ; @loc_70AF96+0x5
-incbin 'apack.re32', 0xafc0, 0x3  ; @loc_70AF96+0xa
+incbin 'apack.re32', 0xaf8f, 4  ; @loc_70AF51+0x1a+4
+times 0xafa3-0xaf73 nop  ; patch: Remove unused code.
 loc_70AFA3:  ; @_text+0xafa3
 incbin 'apack.re32', 0xafc3, 0xb  ; @loc_70AFA3+0x0
 dd is_quiet+0x0  ; @loc_70AFA3+0xb
@@ -10642,20 +10622,10 @@ incbin 'apack.re32', 0xb8f2, 0x6  ; @loc_70B8D2+0x0
 dd count+0x0  ; @loc_70B8D2+0x6
 incbin 'apack.re32', 0xb8fc, 0xc  ; @loc_70B8D2+0xa
 dd skip_or_copy_char_dword+0x0  ; @loc_70B8D2+0x16
-incbin 'apack.re32', 0xb90c, 2  ; @loc_70B8D2+0x1a
+db 0x90, 0x90  ; patch: Skip the comparison.  ; @loc_70B8D2+0x1a
 db 0x90, 0xe9  ; patch: jnz near --> nop + jmp near
-incbin 'apack.re32', 0xb910, 0xc  ; @loc_70B8D2+0x1a+4
-dd aFileHasLuBytes+0x0  ; @loc_70B8D2+0x2a
-call libcu_cprintf  ; @loc_70B8D2+0x2e
-incbin 'apack.re32', 0xb925, 0x3  ; @loc_70B8D2+0x33
-loc_70B908:  ; @_text+0xb908
-times 5 nop  ; call libcu_getch  ; @loc_70B908+0x0
-incbin 'apack.re32', 0xb92d, 0xa  ; @loc_70B908+0x5
-loc_70B917:  ; @_text+0xb917
-incbin 'apack.re32', 0xb937, 0x1  ; @loc_70B917+0x0
-dd aLf_3+0x0  ; @loc_70B917+0x1
-call libcu_printf  ; @loc_70B917+0x5
-incbin 'apack.re32', 0xb941, 0x3  ; @loc_70B917+0xa
+incbin 'apack.re32', 0xb910, 4  ; @loc_70B8D2+0x1a+4
+times 0xb924-0xb8f4 nop  ; patch: Remove unused code.
 loc_70B924:  ; @_text+0xb924
 incbin 'apack.re32', 0xb944, 0xb  ; @loc_70B924+0x0
 dd is_quiet+0x0  ; @loc_70B924+0xb
@@ -10889,11 +10859,6 @@ aNoRelocationsU:  ; @_text+0xbfc9
 incbin 'apack.re32', 0xbfe9, 0x1a  ; @aNoRelocationsU+0x0
 aFixedForUseAsP:  ; @_text+0xbfe3
 incbin 'apack.re32', 0xc003, 0x1f  ; @aFixedForUseAsP+0x0
-aFileHasLuBytes:  ; @_text+0xc002
-db '*'  ; old db 0xfe  ; @aFileHasLuBytes+0x0
-incbin 'apack.re32', 0xc023, 0x44  ; @aFileHasLuBytes+0x1
-aLf:  ; @_text+0xc047
-incbin 'apack.re32', 0xc067, 0x2  ; @aLf+0x0
 aCopyingExtraDa:  ; @_text+0xc049
 incbin 'apack.re32', 0xc069, 0x19  ; @aCopyingExtraDa+0x0
 aSkippingExtraD:  ; @_text+0xc062
@@ -10919,8 +10884,6 @@ aNoRelocationsU_0:  ; @_text+0xc1a4
 incbin 'apack.re32', 0xc1c4, 0x1a  ; @aNoRelocationsU_0+0x0
 aFixedForUseAsP_0:  ; @_text+0xc1be
 incbin 'apack.re32', 0xc1de, 0x1f  ; @aFixedForUseAsP_0+0x0
-aLf_2:  ; @_text+0xc222
-incbin 'apack.re32', 0xc242, 0x2  ; @aLf_2+0x0
 aCopyingExtraDa_0:  ; @_text+0xc224
 incbin 'apack.re32', 0xc244, 0x19  ; @aCopyingExtraDa_0+0x0
 aSkippingExtraD_0:  ; @_text+0xc23d
@@ -10948,8 +10911,6 @@ aNoRelocationsU_1:  ; @_text+0xc39d
 incbin 'apack.re32', 0xc3bd, 0x1a  ; @aNoRelocationsU_1+0x0
 aFixedForUseAsP_1:  ; @_text+0xc3b7
 incbin 'apack.re32', 0xc3d7, 0x1f  ; @aFixedForUseAsP_1+0x0
-aLf_3:  ; @_text+0xc41b
-incbin 'apack.re32', 0xc43b, 0x2  ; @aLf_3+0x0
 aCopyingExtraDa_1:  ; @_text+0xc41d
 incbin 'apack.re32', 0xc43d, 0x19  ; @aCopyingExtraDa_1+0x0
 aSkippingExtraD_1:  ; @_text+0xc436
