@@ -897,7 +897,7 @@ loc_700C82:  ; @_text+0xc82
 incbin 'apack.re32', 0xca2, 0x1  ; @loc_700C82+0x0
 dd aOutExe_0+0x0  ; @loc_700C82+0x1
 incbin 'apack.re32', 0xca7, 0x1  ; @loc_700C82+0x5
-dd aApacktmp_1+0x0  ; @loc_700C82+0x6
+dd aApacktmp+0x0  ; @loc_700C82+0x6
 incbin 'apack.re32', 0xcac, 0x5  ; @loc_700C82+0xa
 loc_700C91:  ; @_text+0xc91
 incbin 'apack.re32', 0xcb1, 0x1  ; @loc_700C91+0x0
@@ -922,7 +922,7 @@ loc_700CD4:  ; @_text+0xcd4
 incbin 'apack.re32', 0xcf4, 0x1  ; @loc_700CD4+0x0
 dd aOutCom_0+0x0  ; @loc_700CD4+0x1
 incbin 'apack.re32', 0xcf9, 0x1  ; @loc_700CD4+0x5
-dd aApacktmp_2+0x0  ; @loc_700CD4+0x6
+dd aApacktmp+0x0  ; @loc_700CD4+0x6
 incbin 'apack.re32', 0xcfe, 0x5  ; @loc_700CD4+0xa
 loc_700CE3:  ; @_text+0xce3
 incbin 'apack.re32', 0xd03, 0x1  ; @loc_700CE3+0x0
@@ -945,7 +945,7 @@ loc_700D1D:  ; @_text+0xd1d
 incbin 'apack.re32', 0xd3d, 0x1  ; @loc_700D1D+0x0
 dd aOutDat_0+0x0  ; @loc_700D1D+0x1
 incbin 'apack.re32', 0xd42, 0x1  ; @loc_700D1D+0x5
-dd aApacktmp_3+0x0  ; @loc_700D1D+0x6
+dd aApacktmp+0x0  ; @loc_700D1D+0x6
 incbin 'apack.re32', 0xd47, 0x5  ; @loc_700D1D+0xa
 loc_700D2C:  ; @_text+0xd2c
 incbin 'apack.re32', 0xd4c, 0x1  ; @loc_700D2C+0x0
@@ -1033,24 +1033,18 @@ aOutExe:  ; @_text+0x1456
 incbin 'apack.re32', 0x1476, 0x8  ; @aOutExe+0x0
 aOutExe_0:  ; @_text+0x145e
 incbin 'apack.re32', 0x147e, 0x8  ; @aOutExe_0+0x0
-aApacktmp_1:  ; @_text+0x1466
-incbin 'apack.re32', 0x1486, 0xd  ; @aApacktmp_1+0x0
 aNoOutputFileSp_0:  ; @_text+0x1473
 incbin 'apack.re32', 0x1493, 0x38  ; @aNoOutputFileSp_0+0x0
 aOutCom:  ; @_text+0x14ab
 incbin 'apack.re32', 0x14cb, 0x8  ; @aOutCom+0x0
 aOutCom_0:  ; @_text+0x14b3
 incbin 'apack.re32', 0x14d3, 0x8  ; @aOutCom_0+0x0
-aApacktmp_2:  ; @_text+0x14bb
-incbin 'apack.re32', 0x14db, 0xd  ; @aApacktmp_2+0x0
 aNoOutputFileSp_1:  ; @_text+0x14c8
 incbin 'apack.re32', 0x14e8, 0x38  ; @aNoOutputFileSp_1+0x0
 aOutDat:  ; @_text+0x1500
 incbin 'apack.re32', 0x1520, 0x8  ; @aOutDat+0x0
 aOutDat_0:  ; @_text+0x1508
 incbin 'apack.re32', 0x1528, 0x8  ; @aOutDat_0+0x0
-aApacktmp_3:  ; @_text+0x1510
-incbin 'apack.re32', 0x1530, 0xd  ; @aApacktmp_3+0x0
 aDoneCompressio:  ; @_text+0x151d
 incbin 'apack.re32', 0x153d, 0x23  ; @aDoneCompressio+0x0
 aLuBytesLuBytes:  ; @_text+0x1540
@@ -4363,7 +4357,7 @@ call libcu_printf  ; @loc_70521A+0xf
 incbin 'apack.re32', 0x524e, 0x3  ; @loc_70521A+0x14
 loc_705231:  ; @_text+0x5231
 incbin 'apack.re32', 0x5251, 0xb  ; @loc_705231+0x0
-dd aApacktmp_4+0x0  ; @loc_705231+0xb
+dd aApacktmp+0x0  ; @loc_705231+0xb
 call libcu_open  ; @loc_705231+0xf
 incbin 'apack.re32', 0x5265, 0x4  ; @loc_705231+0x14
 dd fd6+0x0  ; @loc_705231+0x18
@@ -5315,8 +5309,6 @@ dd byte_711331+0x0  ; @loc_705FE8+0x84
 incbin 'apack.re32', 0x6090, 0x5  ; @loc_705FE8+0x88
 aCodeSizeLuByte:  ; @_text+0x6075
 incbin 'apack.re32', 0x6095, 0x1f  ; @aCodeSizeLuByte+0x0
-aApacktmp_4:  ; @_text+0x6094
-incbin 'apack.re32', 0x60b4, 0xd  ; @aApacktmp_4+0x0
 aAllocatingMemo_0:  ; @_text+0x60a1
 db '*'  ; old db 0xfe  ; @aAllocatingMemo_0+0x0
 incbin 'apack.re32', 0x60c2, 0x14  ; @aAllocatingMemo_0+0x1
@@ -5491,7 +5483,7 @@ dd dword_711488+0x0  ; @loc_7065D3+0x14
 incbin 'apack.re32', 0x660b, 0x1  ; @loc_7065D3+0x18
 loc_7065EC:  ; @_text+0x65ec
 incbin 'apack.re32', 0x660c, 0xb  ; @loc_7065EC+0x0
-dd aApacktmp_5+0x0  ; @loc_7065EC+0xb
+dd aApacktmp+0x0  ; @loc_7065EC+0xb
 call libcu_open  ; @loc_7065EC+0xf
 incbin 'apack.re32', 0x6620, 0x4  ; @loc_7065EC+0x14
 dd fd6+0x0  ; @loc_7065EC+0x18
@@ -10786,8 +10778,6 @@ aExtraDataLuByt:  ; @_text+0xbc33
 incbin 'apack.re32', 0xbc53, 0x1f  ; @aExtraDataLuByt+0x0
 aRelocationsU:  ; @_text+0xbc52
 incbin 'apack.re32', 0xbc72, 0x18  ; @aRelocationsU+0x0
-aApacktmp_5:  ; @_text+0xbc6a
-incbin 'apack.re32', 0xbc8a, 0xd  ; @aApacktmp_5+0x0
 aAllocatingMemo:  ; @_text+0xbc77
 db '*'  ; old db 0xfe  ; @aAllocatingMemo+0x0
 incbin 'apack.re32', 0xbc98, 0x14  ; @aAllocatingMemo+0x1
