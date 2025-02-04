@@ -12100,7 +12100,6 @@ _mbctoupper_:
 
 ; NASM isn't able to add this to the .obj, so we add `library clib3r' instead to the wlink command line:
 ; COMENT(88) recnum:23, offset:00000185h, len:0009h, chksum:11h(11) bits 80h, class 9fh Default Library: "clib3r"
-; !!! Implement these functions (symbols): close_ remove_ exit_ open_ lseek_ filelength_ read_ rename_ malloc_.
 
 STD_OUTPUT_HANDLE equ -11
 
@@ -12285,7 +12284,6 @@ libcu_write:  ; Inputs: EAX: arg1; EDX: arg2; EBX: arg3. Outputs: result in EAX.
 libcu_read:  ; Inputs: EAX: arg1; EDX: arg2; EBX: arg3. Outputs: result in EAX.
 		push dword _ReadFile@20
 		jmp short read_write_helper
-		; !!! Why is the wrong data (size) written? Is it a read issue? Is it a VirtualAlloc memory init issue?
 
 libcu_close:  ; Inputs: EAX: arg1. Outputs: result in EAX. Outputs: result in EAX.
 		cmp eax, byte 5
@@ -12437,8 +12435,6 @@ libcu_malloc:  ; Inputs: EAX: size (arg1). Outputs: result in EAX, or NULL.
 .full:		; Try to allocate new block or extend the current block by at least 256 KiB.
 		; It's possible to extend in Wine, but not with mwpestub.
 		mov ebx, 0x100<<10  ; 256 KiB.
-		;mov ebx, 4<<20  ; 4 MiB. !!! Even this big allocation is buggy.
-		;mov ebx, 1<<20  ; 4 MiB. !!! Even this big allocation is buggy.
 		cmp ebx, edx
 		jae short .try_alloc
 		mov ebx, edx
