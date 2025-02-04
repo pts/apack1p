@@ -445,9 +445,9 @@ dd is_quiet+0x0  ; @loc_7004F9+0x2
 incbin 'apack.re32', 0x51f, 0x9  ; @loc_7004F9+0x6
 loc_700508:  ; @_text+0x508
 incbin 'apack.re32', 0x528, 0x2  ; @loc_700508+0x0
-dd dword_751DF4+0x0  ; @loc_700508+0x2
+dd skip_or_copy_char_dword+0x0  ; @loc_700508+0x2
 incbin 'apack.re32', 0x52e, 0xb  ; @loc_700508+0x6
-dd dword_751DF4+0x0  ; @loc_700508+0x11
+dd skip_or_copy_char_dword+0x0  ; @loc_700508+0x11
 incbin 'apack.re32', 0x53d, 0x5  ; @loc_700508+0x15
 loc_700522:  ; @_text+0x522
 incbin 'apack.re32', 0x542, 0x1  ; @loc_700522+0x0
@@ -981,7 +981,9 @@ incbin 'apack.re32', 0xe98, 0x1b  ; @aAnUnknownError+0x0
 aApacktmp:  ; @_text+0xe93
 incbin 'apack.re32', 0xeb3, 0xd  ; @aApacktmp+0x0
 aSyntaxApackOpt:  ; @_text+0xea0
-incbin 'apack.re32', 0xec0, 0x264  ; @aSyntaxApackOpt+0x0
+incbin 'apack.re32', 0xec0, 0x1b5  ; @aSyntaxApackOpt+0x0
+db 'default; '  ; patch: extend help stating that -c is the default.
+incbin 'apack.re32', 0xec0+0x1b5, 0x264-0x1b5  ; @aSyntaxApackOpt+0x1b5
 aQBeQuiet:  ; @_text+0x1104
 incbin 'apack.re32', 0x1124, 0x13  ; @aQBeQuiet+0x0
 aNl:  ; @_text+0x1117
@@ -9463,13 +9465,15 @@ loc_70A758:  ; @_text+0xa758
 incbin 'apack.re32', 0xa778, 0x6  ; @loc_70A758+0x0
 dd count+0x0  ; @loc_70A758+0x6
 incbin 'apack.re32', 0xa782, 0xc  ; @loc_70A758+0xa
-dd dword_751DF4+0x0  ; @loc_70A758+0x16
-incbin 'apack.re32', 0xa792, 0x10  ; @loc_70A758+0x1a
+dd skip_or_copy_char_dword+0x0  ; @loc_70A758+0x16
+incbin 'apack.re32', 0xa792, 2  ; @loc_70A758+0x1a
+db 0x90, 0xe9  ; patch: jnz near --> nop + jmp near
+incbin 'apack.re32', 0xa796, 0xc  ; @loc_70A758+0x1a+4
 dd aFileHasLuBytes+0x0  ; @loc_70A758+0x2a
 call libcu_cprintf  ; @loc_70A758+0x2e
 incbin 'apack.re32', 0xa7ab, 0x3  ; @loc_70A758+0x33
 loc_70A78E:  ; @_text+0xa78e
-call libcu_getch  ; @loc_70A78E+0x0
+times 5 nop  ; call libcu_getch  ; @loc_70A78E+0x0
 incbin 'apack.re32', 0xa7b3, 0xa  ; @loc_70A78E+0x5
 loc_70A79D:  ; @_text+0xa79d
 incbin 'apack.re32', 0xa7bd, 0x1  ; @loc_70A79D+0x0
@@ -9565,7 +9569,9 @@ incbin 'apack.re32', 0xa92d, 0xd  ; @loc_70A90D+0x0
 dd byte_711D0F+0x0  ; @loc_70A90D+0xd
 incbin 'apack.re32', 0xa93e, 0x3  ; @loc_70A90D+0x11
 loc_70A921:  ; @_text+0xa921
-incbin 'apack.re32', 0xa941, 0x7  ; @loc_70A921+0x0
+incbin 'apack.re32', 0xa941, 0x3  ; @loc_70A921+0x0
+db 0x77  ; patch: jnz short --> ja short
+incbin 'apack.re32', 0xa945, 0x3  ; @loc_70A921+0x0+3
 loc_70A928:  ; @_text+0xa928
 incbin 'apack.re32', 0xa948, 0x7  ; @loc_70A928+0x0
 loc_70A92F:  ; @_text+0xa92f
@@ -10000,13 +10006,15 @@ loc_70AF51:  ; @_text+0xaf51
 incbin 'apack.re32', 0xaf71, 0x6  ; @loc_70AF51+0x0
 dd count+0x0  ; @loc_70AF51+0x6
 incbin 'apack.re32', 0xaf7b, 0xc  ; @loc_70AF51+0xa
-dd dword_751DF4+0x0  ; @loc_70AF51+0x16
-incbin 'apack.re32', 0xaf8b, 0x10  ; @loc_70AF51+0x1a
+dd skip_or_copy_char_dword+0x0  ; @loc_70AF51+0x16
+incbin 'apack.re32', 0xaf8b, 2  ; @loc_70AF51+0x1a
+db 0x90, 0xe9  ; patch: jnz near --> nop + jmp near
+incbin 'apack.re32', 0xaf91, 0xc  ; @loc_70AF51+0x1a+4
 dd aFileHasLuBytes+0x0  ; @loc_70AF51+0x2a
 call libcu_cprintf  ; @loc_70AF51+0x2e
 incbin 'apack.re32', 0xafa4, 0x3  ; @loc_70AF51+0x33
 loc_70AF87:  ; @_text+0xaf87
-call libcu_getch  ; @loc_70AF87+0x0
+times 5 nop  ; call libcu_getch  ; @loc_70AF87+0x0
 incbin 'apack.re32', 0xafac, 0xa  ; @loc_70AF87+0x5
 loc_70AF96:  ; @_text+0xaf96
 incbin 'apack.re32', 0xafb6, 0x1  ; @loc_70AF96+0x0
@@ -10108,7 +10116,9 @@ incbin 'apack.re32', 0xb160, 0xd  ; @loc_70B140+0x0
 dd byte_711D0F+0x0  ; @loc_70B140+0xd
 incbin 'apack.re32', 0xb171, 0x3  ; @loc_70B140+0x11
 loc_70B154:  ; @_text+0xb154
-incbin 'apack.re32', 0xb174, 0x7  ; @loc_70B154+0x0
+incbin 'apack.re32', 0xb174, 3  ; @loc_70B154+0x0
+db 0x77  ; patch: jnz short --> ja short
+incbin 'apack.re32', 0xb178, 0x3  ; @loc_70B154+0x0+4
 loc_70B15B:  ; @_text+0xb15b
 incbin 'apack.re32', 0xb17b, 0x7  ; @loc_70B15B+0x0
 loc_70B162:  ; @_text+0xb162
@@ -10631,13 +10641,15 @@ loc_70B8D2:  ; @_text+0xb8d2
 incbin 'apack.re32', 0xb8f2, 0x6  ; @loc_70B8D2+0x0
 dd count+0x0  ; @loc_70B8D2+0x6
 incbin 'apack.re32', 0xb8fc, 0xc  ; @loc_70B8D2+0xa
-dd dword_751DF4+0x0  ; @loc_70B8D2+0x16
-incbin 'apack.re32', 0xb90c, 0x10  ; @loc_70B8D2+0x1a
+dd skip_or_copy_char_dword+0x0  ; @loc_70B8D2+0x16
+incbin 'apack.re32', 0xb90c, 2  ; @loc_70B8D2+0x1a
+db 0x90, 0xe9  ; patch: jnz near --> nop + jmp near
+incbin 'apack.re32', 0xb910, 0xc  ; @loc_70B8D2+0x1a+4
 dd aFileHasLuBytes+0x0  ; @loc_70B8D2+0x2a
 call libcu_cprintf  ; @loc_70B8D2+0x2e
 incbin 'apack.re32', 0xb925, 0x3  ; @loc_70B8D2+0x33
 loc_70B908:  ; @_text+0xb908
-call libcu_getch  ; @loc_70B908+0x0
+times 5 nop  ; call libcu_getch  ; @loc_70B908+0x0
 incbin 'apack.re32', 0xb92d, 0xa  ; @loc_70B908+0x5
 loc_70B917:  ; @_text+0xb917
 incbin 'apack.re32', 0xb937, 0x1  ; @loc_70B917+0x0
@@ -10749,7 +10761,9 @@ incbin 'apack.re32', 0xbb40, 0xd  ; @loc_70BB20+0x0
 dd byte_711D0F+0x0  ; @loc_70BB20+0xd
 incbin 'apack.re32', 0xbb51, 0x3  ; @loc_70BB20+0x11
 loc_70BB34:  ; @_text+0xbb34
-incbin 'apack.re32', 0xbb54, 0x7  ; @loc_70BB34+0x0
+incbin 'apack.re32', 0xbb54, 3  ; @loc_70BB34+0x0
+db 0x77  ; patch: jnz short --> ja short
+incbin 'apack.re32', 0xbb58, 0x3  ; @loc_70BB34+0x0+4
 loc_70BB3B:  ; @_text+0xbb3b
 incbin 'apack.re32', 0xbb5b, 0x7  ; @loc_70BB3B+0x0
 loc_70BB42:  ; @_text+0xbb42
@@ -11422,8 +11436,8 @@ dword_751DEC:  ; @_bss+0x400e4
 resb 0x4  ; @dword_751DEC+0x0
 is_quiet:  ; @_bss+0x400e8
 resb 0x4  ; @is_quiet+0x0
-dword_751DF4:  ; @_bss+0x400ec
-resb 0x4  ; @dword_751DF4+0x0
+skip_or_copy_char_dword:  ; @_bss+0x400ec
+resb 0x4  ; @skip_or_copy_char_dword+0x0
 dword_751DF8:  ; @_bss+0x400f0
 resb 0x4  ; @dword_751DF8+0x0
 dword_751DFC:  ; @_bss+0x400f4
@@ -11520,10 +11534,6 @@ section _TEXT
 
 get_internal_error_code_ptr:  ; !! Inline or refactor this.
 		mov eax, mylibc_internal_error_code  ; Value is 0. Shouldn't be 6 (which the caller considers fatal after remove(3)).
-		ret
-
-libcu_getch:  ; !! Use a switch to answer the question about the overlay. Now it has an interactive prompt: aFileHasLuBytes.
-		xor eax, eax  ; No key to read.
 		ret
 
 %if 1  ; %ifndef T_DOS32  ; !! Write better shims for T_WIN32 and T_LI3. Do we even want this?
