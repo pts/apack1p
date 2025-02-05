@@ -20,12 +20,15 @@
 ; * Enabled command-line flag -q even for non-registered.
 ; * Added command-line flag -r to simulate registered behavior (it produces different output). This works only at the beginning (argv[1]).
 ; * Written libc for the Linux i386 port. The only non-syscall was printf(1), which was implemented tailor-made for aPACK.
+; * Disabled the abort-by-pressing-Esc functinality.
+; * Disabled the interactive *\[c\]opy or \[s\]kip* prompt, by making *-c* (copy) the default. This has made apack1p noninteractive and fully command-line-driven.
+; * Added the *-a* command-line flag to enable creating the temporary file (*APACKTMP.$$$*). (Previously it was the default.) This has made execution of multiple apack1p processes in the same directory reentrant (i.e. not disturbing each other).
 ; * !! Make it reentrant: run multiple copies (with different output filenames) in the same directory; modify tmp filename (APACKTMP.$$$) to something PID-related etc.
 ; * !! Write libc for T_DOS32, drop the OpenWatcom clib3rdos.lib.
 ; * !! After T_DOS32 is finished, port it to OIX (their ABIs are similar). Use `nasm -f elf' and then elf2oix.pl.
 ; * !! Merge the T_DOS32 .exe to the T_WIN32 .exe. Maybe do it by porting it to OIX.
 ; * !! Is packing data ever used?
-; * !! Some functions replaced with shims: get_internal_error_code_ptr. !! What does this mean?
+; * !! Some functions replaced with shims: libcu_get_internal_error_code_ptr. !! What does this mean?
 ; * !! Some functions replaced with shims: libcu_dos_getftime, libcu_dos_setftime. !! What does this mean?
 ; * !! deduplicate string literals (*_0, *_1 etc.)
 ; * !! doc: Don't transform LF to CRLF (for compatibility with T_WIN32_OR_DOS32).
@@ -34,6 +37,7 @@
 ; * !! file date and time for Win32
 ; * !! get rid of OpenWatcom libc library apackdos.lib functions: close_ remove_ exit_ open_ lseek_ filelength_ read_ rename_ malloc_ write_
 ; * !! get rid of wlink(1), generate Win32 executable with NASM only; this will be tricky without PE .reloc generation support in NASM; but we can use the decimg.nasm trick
+; * !! @0x413 cmp bl, '/' ; !! TODO(pts): Does this prevent using of absolute filenames on Linux?
 ; * later: port it to FreeBSD i386 and other i386 on other popular BSDs
 ; * later: port it to macOS i386. The last release of macOS which supports i386 (*32-bit apps*) is macOS 10.14 Mojave released on 2018-09-24.
 ; * write a (limited) lightweight i386 emulator in ANSI C, and run it the emulator.
@@ -41,13 +45,13 @@
 ; Memory map of apack.re32:
 ;
 ;   .text:
-;   
+;
 ;     0x00010...0x0c9cc: program code .text (contains some NUL-terminated string literals)
 ;     0x0c9d0...0x0c9f2: libcu_printf (why here?)
 ;     0x0ca00...0x10b23: libc code .text (only a tiny fraction of the function is called from the program)
-;   
+;
 ;   .data (small in total):
-;   
+;
 ;     0x11000...0x119c0: program .data
 ;       0x11000...0x11104: some libc .data stuff
 ;       0x11004...0x11010: program .data: db 'aPACK v1.00', 0
@@ -55,9 +59,9 @@
 ;       0x11110...0x11114: program_name_ptr, must point to "aPACK v1.00" somewhere (0x11004 or else)
 ;       0x11114...0x119c0: bulk of program .data
 ;     0x119c0...0x11d08: libc .data (including stdout), no program code or data refers to it (not even to stdout)
-;   
+;
 ;   .bss:
-;   
+;
 ;     0x11d08...0x11d0f: unused .bss
 ;     0x11d0f...0x526a8: program .bss (large)
 ;     0x526a8...0x528a0: libc .bss: copy of DOS command-line arguments
@@ -215,7 +219,7 @@ incbin 'apack.re32', 0x117, 0x6  ; @loc_7000F1+0x6
 call_libcu_free  ; patch: Don't free.  ; @loc_7000F1+0xc
 loc_700102:  ; @_text+0x102
 incbin 'apack.re32', 0x122, 0x2  ; @loc_700102+0x0
-dd fd5+0x0  ; @loc_700102+0x2
+dd input_file_fd+0x0  ; @loc_700102+0x2
 incbin 'apack.re32', 0x128, 0x7  ; @loc_700102+0x6
 call libcu_close  ; @loc_700102+0xd
 loc_700114:  ; @_text+0x114
@@ -225,7 +229,7 @@ incbin 'apack.re32', 0x13a, 0x9  ; @loc_700114+0x6
 loc_700123:  ; @_text+0x123
 incbin 'apack.re32', 0x143, 0x1  ; @loc_700123+0x0
 dd aApacktmp+0x0  ; @loc_700123+0x1
-call libcu_remove  ; @loc_700123+0x5
+call remove_apacktmp  ; @loc_700123+0x5
 
 times 0x13b-0x12d nop  ; @loc_700123+0xa  ; patch: Ignore `int 10h' video changes.
 incbin 'apack.re32', 0x15b, 0x13d-0x13b
@@ -307,19 +311,25 @@ dd loc_700C20+0x0  ; @jpt_700A53+0x10
 
 prog_main: ; Patch for the -r (registered) flag at the front.
 		push ebx
-		mov ebx, [edx+4]
+.try_argv1:	mov ebx, [edx+4]
 		test ebx, ebx
-		jz strict short .not_r  ; Jump if argv[1] == NULL.
+		jz strict short .no_argv1  ; Jump if argv[1] == NULL.
 		mov ebx, [ebx]
-		and ebx, ~0xff002000
+		and ebx, ~0xff002000  ; Case insensitive below.
 		cmp ebx, '-R'
 		jne strict short .not_r
-		dec eax  ; EAX (argc) -= 1.
-		mov ebx, [edx]
-		add edx, 4  ; argv += 1.
-		mov [edx], ebx
 		inc dword [is_registered]
-.not_r:		pop ebx
+.try_next_argv1:
+		dec eax  ; EAX (argc) -= 1.
+		mov ebx, [edx]  ; Save argv[0] to EBX.
+		add edx, byte 4  ; argv += 1.
+		mov [edx], ebx  ; Copy argv[0].
+		jmp strict short .try_argv1
+.not_r:		cmp ebx, '-A'
+		jne strict short .no_argv1
+		mov byte [do_use_apacktmp], 1
+		jmp strict short .try_next_argv1
+.no_argv1:	pop ebx
 		; Fall through.
 prog_main_orig:  ; @_text+0x324
 incbin 'apack.re32', 0x344, 0x17  ; @prog_main+0x0
@@ -331,7 +341,7 @@ xor eax, eax
 times 3 nop  ; Fill to size of original.
 
 incbin 'apack.re32', 0x360, 0x2  ; @prog_main+0x1c
-dd fd5+0x0  ; @prog_main+0x1e
+dd input_file_fd+0x0  ; @prog_main+0x1e
 incbin 'apack.re32', 0x366, 0x4  ; @prog_main+0x22
 
 times 5 nop  ; patch: Don't overwrite is_registered.
@@ -383,10 +393,11 @@ call libcu_printf  ; @loc_7003FD+0x5
 incbin 'apack.re32', 0x427, 0x5  ; @loc_7003FD+0xa
 loc_70040C:  ; @_text+0x40c
 incbin 'apack.re32', 0x42c, 0x1  ; @loc_70040C+0x0
-dd aNl+0x0  ; @loc_70040C+0x1
+dd aNoQuiet+0x0  ; @loc_70040C+0x1
 incbin 'apack.re32', 0x431, 0x2  ; @loc_70040C+0x5
 loc_700413:  ; @_text+0x413
-incbin 'apack.re32', 0x433, 0x28  ; @loc_700413+0x0
+incbin 'apack.re32', 0x433, 0x23  ; @loc_700413+0x0
+jmp strict near save_output_filename  ; patch: Save output filename for later use.  ; @loc_700413+0x23
 loc_70043B:  ; @_text+0x43b
 incbin 'apack.re32', 0x45b, 0x2  ; @loc_70043B+0x0
 dd dword_751DD8+0x0  ; @loc_70043B+0x2
@@ -456,7 +467,7 @@ call libcu_printf  ; @loc_700522+0x5
 incbin 'apack.re32', 0x54c, 0x8  ; @loc_700522+0xa
 loc_700534:  ; @_text+0x534
 incbin 'apack.re32', 0x554, 0x1  ; @loc_700534+0x0
-dd aNl+0x0  ; @loc_700534+0x1
+dd aNoQuiet+0x0  ; @loc_700534+0x1
 incbin 'apack.re32', 0x559, 0x5  ; @loc_700534+0x5
 loc_70053E:  ; @_text+0x53e
 incbin 'apack.re32', 0x55e, 0x2d  ; @loc_70053E+0x0
@@ -533,9 +544,9 @@ call libcu_printf  ; @loc_70070D+0x1c
 incbin 'apack.re32', 0x74e, 0x3  ; @loc_70070D+0x21
 loc_700731:  ; @_text+0x731
 incbin 'apack.re32', 0x751, 0xd  ; @loc_700731+0x0
-call libcu_open  ; @loc_700731+0xd
+call open_input_file  ; @loc_700731+0xd
 incbin 'apack.re32', 0x763, 0x4  ; @loc_700731+0x12
-dd fd5+0x0  ; @loc_700731+0x16
+dd input_file_fd+0x0  ; @loc_700731+0x16
 incbin 'apack.re32', 0x76b, 0xa  ; @loc_700731+0x1a
 call prog_fatal_error  ; @loc_700731+0x24
 loc_70075A:  ; @_text+0x75a
@@ -544,30 +555,30 @@ dd time+0x0  ; @loc_70075A+0x1
 incbin 'apack.re32', 0x77f, 0x1  ; @loc_70075A+0x5
 dd date+0x0  ; @loc_70075A+0x6
 incbin 'apack.re32', 0x784, 0x1  ; @loc_70075A+0xa
-dd fd5+0x0  ; @loc_70075A+0xb
+dd input_file_fd+0x0  ; @loc_70075A+0xb
 call libcu_dos_getftime  ; @loc_70075A+0xf
 incbin 'apack.re32', 0x78e, 0x9  ; @loc_70075A+0x14
 call prog_fatal_error  ; @loc_70075A+0x1d
 loc_70077C:  ; @_text+0x77c
 incbin 'apack.re32', 0x79c, 0x1  ; @loc_70077C+0x0
-dd fd5+0x0  ; @loc_70077C+0x1
+dd input_file_fd+0x0  ; @loc_70077C+0x1
 incbin 'apack.re32', 0x7a1, 0x4  ; @loc_70077C+0x5
 call libcu_lseek  ; @loc_70077C+0x9
 incbin 'apack.re32', 0x7aa, 0x1  ; @loc_70077C+0xe
-dd fd5+0x0  ; @loc_70077C+0xf
+dd input_file_fd+0x0  ; @loc_70077C+0xf
 call libcu_filelength  ; @loc_70077C+0x13
 incbin 'apack.re32', 0x7b4, 0x1  ; @loc_70077C+0x18
-dd count+0x0  ; @loc_70077C+0x19
+dd input_file_size+0x0  ; @loc_70077C+0x19
 incbin 'apack.re32', 0x7b9, 0xa  ; @loc_70077C+0x1d
 call prog_fatal_error  ; @loc_70077C+0x27
 loc_7007A8:  ; @_text+0x7a8
 incbin 'apack.re32', 0x7c8, 0x6  ; @loc_7007A8+0x0
-dd byte_711D10+0x0  ; @loc_7007A8+0x6
+dd input_file_header_buf+0x0  ; @loc_7007A8+0x6
 incbin 'apack.re32', 0x7d2, 0x1  ; @loc_7007A8+0xa
-dd fd5+0x0  ; @loc_7007A8+0xb
+dd input_file_fd+0x0  ; @loc_7007A8+0xb
 call libcu_read  ; @loc_7007A8+0xf
 incbin 'apack.re32', 0x7dc, 0x2  ; @loc_7007A8+0x14
-dd byte_711D10+0x0  ; @loc_7007A8+0x16
+dd input_file_header_buf+0x0  ; @loc_7007A8+0x16
 incbin 'apack.re32', 0x7e2, 0x9  ; @loc_7007A8+0x1a
 dd byte_711D11+0x0  ; @loc_7007A8+0x23
 incbin 'apack.re32', 0x7ef, 0x7  ; @loc_7007A8+0x27
@@ -575,7 +586,7 @@ loc_7007D6:  ; @_text+0x7d6
 incbin 'apack.re32', 0x7f6, 0x2  ; @loc_7007D6+0x0
 dd dword_751DE4+0x0  ; @loc_7007D6+0x2
 incbin 'apack.re32', 0x7fc, 0xb  ; @loc_7007D6+0x6
-dd dword_751DF8+0x0  ; @loc_7007D6+0x11
+dd is_not_exe_dword+0x0  ; @loc_7007D6+0x11
 loc_7007EB:  ; @_text+0x7eb
 incbin 'apack.re32', 0x80b, 0x2  ; @loc_7007EB+0x0
 dd dword_751DD4+0x0  ; @loc_7007EB+0x2
@@ -585,11 +596,11 @@ call libcu_printf  ; @loc_7007EB+0xe
 incbin 'apack.re32', 0x81e, 0x3  ; @loc_7007EB+0x13
 loc_700801:  ; @_text+0x801
 incbin 'apack.re32', 0x821, 0x2  ; @loc_700801+0x0
-dd count+0x0  ; @loc_700801+0x2
+dd input_file_size+0x0  ; @loc_700801+0x2
 incbin 'apack.re32', 0x827, 0xb  ; @loc_700801+0x6
 call prog_fatal_error  ; @loc_700801+0x11
 loc_700817:  ; @_text+0x817
-call prog_sub_705155  ; @loc_700817+0x0
+call prog_compress_dos_com  ; @loc_700817+0x0
 incbin 'apack.re32', 0x83c, 0x5  ; @loc_700817+0x5
 loc_700821:  ; @_text+0x821
 incbin 'apack.re32', 0x841, 0x2  ; @loc_700821+0x0
@@ -642,17 +653,17 @@ call libcu_printf  ; @loc_7008C4+0x5
 incbin 'apack.re32', 0x8ee, 0x8  ; @loc_7008C4+0xa
 loc_7008D6:  ; @_text+0x8d6
 incbin 'apack.re32', 0x8f6, 0x2  ; @loc_7008D6+0x0
-dd byte_711D10+0x0  ; @loc_7008D6+0x2
+dd input_file_header_buf+0x0  ; @loc_7008D6+0x2
 incbin 'apack.re32', 0x8fc, 0x5  ; @loc_7008D6+0x6
 dd byte_711D11+0x0  ; @loc_7008D6+0xb
 incbin 'apack.re32', 0x905, 0x7  ; @loc_7008D6+0xf
 loc_7008EC:  ; @_text+0x8ec
 incbin 'apack.re32', 0x90c, 0x2  ; @loc_7008EC+0x0
-dd dword_751DF8+0x0  ; @loc_7008EC+0x2
+dd is_not_exe_dword+0x0  ; @loc_7008EC+0x2
 incbin 'apack.re32', 0x912, 0x9  ; @loc_7008EC+0x6
 loc_7008FB:  ; @_text+0x8fb
 incbin 'apack.re32', 0x91b, 0x2  ; @loc_7008FB+0x0
-dd dword_751DF8+0x0  ; @loc_7008FB+0x2
+dd is_not_exe_dword+0x0  ; @loc_7008FB+0x2
 incbin 'apack.re32', 0x921, 0x9  ; @loc_7008FB+0x6
 dd dword_751DD4+0x0  ; @loc_7008FB+0xf
 incbin 'apack.re32', 0x92e, 0x7  ; @loc_7008FB+0x13
@@ -662,15 +673,15 @@ dd word_711D18+0x0  ; @loc_700915+0x3
 incbin 'apack.re32', 0x93c, 0x9  ; @loc_700915+0x7
 dd offset+0x0  ; @loc_700915+0x10
 incbin 'apack.re32', 0x949, 0xe  ; @loc_700915+0x14
-dd count+0x0  ; @loc_700915+0x22
+dd input_file_size+0x0  ; @loc_700915+0x22
 incbin 'apack.re32', 0x95b, 0x7  ; @loc_700915+0x26
-dd fd5+0x0  ; @loc_700915+0x2d
+dd input_file_fd+0x0  ; @loc_700915+0x2d
 incbin 'apack.re32', 0x966, 0x2  ; @loc_700915+0x31
 call libcu_lseek  ; @loc_700915+0x33
 incbin 'apack.re32', 0x96d, 0x6  ; @loc_700915+0x38
 dd byte_711D90+0x0  ; @loc_700915+0x3e
 incbin 'apack.re32', 0x977, 0x1  ; @loc_700915+0x42
-dd fd5+0x0  ; @loc_700915+0x43
+dd input_file_fd+0x0  ; @loc_700915+0x43
 call libcu_read  ; @loc_700915+0x47
 incbin 'apack.re32', 0x981, 0x2  ; @loc_700915+0x4c
 dd byte_711D90+0x0  ; @loc_700915+0x4e
@@ -689,7 +700,7 @@ dd aExe+0x0  ; @loc_700982+0xa
 call libcu_printf  ; @loc_700982+0xe
 incbin 'apack.re32', 0x9b5, 0x3  ; @loc_700982+0x13
 loc_700998:  ; @_text+0x998
-call prog_sub_7063C7  ; @loc_700998+0x0
+call prog_compress_mz_exe  ; @loc_700998+0x0
 incbin 'apack.re32', 0x9bd, 0x5  ; @loc_700998+0x5
 loc_7009A2:  ; @_text+0x9a2
 incbin 'apack.re32', 0x9c2, 0x1  ; @loc_7009A2+0x0
@@ -802,7 +813,7 @@ call libcu_printf  ; @loc_700AE5+0xe
 incbin 'apack.re32', 0xb18, 0x3  ; @loc_700AE5+0x13
 loc_700AFB:  ; @_text+0xafb
 incbin 'apack.re32', 0xb1b, 0x2  ; @loc_700AFB+0x0
-dd fd5+0x0  ; @loc_700AFB+0x2
+dd input_file_fd+0x0  ; @loc_700AFB+0x2
 incbin 'apack.re32', 0xb21, 0x7  ; @loc_700AFB+0x6
 call libcu_close  ; @loc_700AFB+0xd
 loc_700B0D:  ; @_text+0xb0d
@@ -822,9 +833,9 @@ incbin 'apack.re32', 0xb57, 0x7  ; @loc_700B31+0x6
 call libcu_close  ; @loc_700B31+0xd
 loc_700B43:  ; @_text+0xb43
 incbin 'apack.re32', 0xb63, 0x11  ; @loc_700B43+0x0
-call libcu_remove  ; @loc_700B43+0x11
+call maybe_remove_output_file  ; @loc_700B43+0x11
 incbin 'apack.re32', 0xb79, 0x4  ; @loc_700B43+0x16
-call get_internal_error_code_ptr  ; @loc_700B43+0x1a
+call libcu_get_internal_error_code_ptr  ; @loc_700B43+0x1a
 incbin 'apack.re32', 0xb82, 0xa  ; @loc_700B43+0x1f
 call prog_fatal_error  ; @loc_700B43+0x29
 loc_700B71:  ; @_text+0xb71
@@ -832,21 +843,21 @@ incbin 'apack.re32', 0xb91, 0x5  ; @loc_700B71+0x0
 dd oldpath+0x0  ; @loc_700B71+0x5
 incbin 'apack.re32', 0xb9a, 0x3  ; @loc_700B71+0x9
 loc_700B7D:  ; @_text+0xb7d
-call libcu_rename  ; @loc_700B7D+0x0
+call rename_from_apacktmp  ; @loc_700B7D+0x0
 incbin 'apack.re32', 0xba2, 0x9  ; @loc_700B7D+0x5
 call prog_fatal_error  ; @loc_700B7D+0xe
 loc_700B90:  ; @_text+0xb90
 incbin 'apack.re32', 0xbb0, 0x2  ; @loc_700B90+0x0
 dd dword_711D98+0x0  ; @loc_700B90+0x2
 incbin 'apack.re32', 0xbb6, 0x13  ; @loc_700B90+0x6
-dd count+0x0  ; @loc_700B90+0x19
+dd input_file_size+0x0  ; @loc_700B90+0x19
 incbin 'apack.re32', 0xbcd, 0x9  ; @loc_700B90+0x1d
 dd aDoneCompressio+0x0  ; @loc_700B90+0x26
 call libcu_printf  ; @loc_700B90+0x2a
 incbin 'apack.re32', 0xbdf, 0x5  ; @loc_700B90+0x2f
 dd dword_711D98+0x0  ; @loc_700B90+0x34
 incbin 'apack.re32', 0xbe8, 0x3  ; @loc_700B90+0x38
-dd count+0x0  ; @loc_700B90+0x3b
+dd input_file_size+0x0  ; @loc_700B90+0x3b
 incbin 'apack.re32', 0xbef, 0x2  ; @loc_700B90+0x3f
 dd aLuBytesLuBytes+0x0  ; @loc_700B90+0x41
 call libcu_printf  ; @loc_700B90+0x45
@@ -881,7 +892,7 @@ dd aUnknown+0x0  ; @def_700A53+0xe
 incbin 'apack.re32', 0xc69, 0x5  ; @def_700A53+0x12
 loc_700C4E:  ; @_text+0xc4e
 incbin 'apack.re32', 0xc6e, 0x2  ; @loc_700C4E+0x0
-dd dword_751DF8+0x0  ; @loc_700C4E+0x2
+dd is_not_exe_dword+0x0  ; @loc_700C4E+0x2
 incbin 'apack.re32', 0xc74, 0x5  ; @loc_700C4E+0x6
 dd is_quiet+0x0  ; @loc_700C4E+0xb
 incbin 'apack.re32', 0xc7d, 0x3  ; @loc_700C4E+0xf
@@ -890,12 +901,12 @@ incbin 'apack.re32', 0xc80, 0x1  ; @loc_700C60+0x0
 dd aOutExe+0x0  ; @loc_700C60+0x1
 call libcu_remove  ; @loc_700C60+0x5
 incbin 'apack.re32', 0xc8a, 0x4  ; @loc_700C60+0xa
-call get_internal_error_code_ptr  ; @loc_700C60+0xe
+call libcu_get_internal_error_code_ptr  ; @loc_700C60+0xe
 incbin 'apack.re32', 0xc93, 0xa  ; @loc_700C60+0x13
 call prog_fatal_error  ; @loc_700C60+0x1d
 loc_700C82:  ; @_text+0xc82
 incbin 'apack.re32', 0xca2, 0x1  ; @loc_700C82+0x0
-dd aOutExe_0+0x0  ; @loc_700C82+0x1
+dd aOutExe+0x0  ; @loc_700C82+0x1
 incbin 'apack.re32', 0xca7, 0x1  ; @loc_700C82+0x5
 dd aApacktmp+0x0  ; @loc_700C82+0x6
 incbin 'apack.re32', 0xcac, 0x5  ; @loc_700C82+0xa
@@ -915,12 +926,12 @@ incbin 'apack.re32', 0xcd2, 0x1  ; @loc_700CB2+0x0
 dd aOutCom+0x0  ; @loc_700CB2+0x1
 call libcu_remove  ; @loc_700CB2+0x5
 incbin 'apack.re32', 0xcdc, 0x4  ; @loc_700CB2+0xa
-call get_internal_error_code_ptr  ; @loc_700CB2+0xe
+call libcu_get_internal_error_code_ptr  ; @loc_700CB2+0xe
 incbin 'apack.re32', 0xce5, 0xa  ; @loc_700CB2+0x13
 call prog_fatal_error  ; @loc_700CB2+0x1d
 loc_700CD4:  ; @_text+0xcd4
 incbin 'apack.re32', 0xcf4, 0x1  ; @loc_700CD4+0x0
-dd aOutCom_0+0x0  ; @loc_700CD4+0x1
+dd aOutCom+0x0  ; @loc_700CD4+0x1
 incbin 'apack.re32', 0xcf9, 0x1  ; @loc_700CD4+0x5
 dd aApacktmp+0x0  ; @loc_700CD4+0x6
 incbin 'apack.re32', 0xcfe, 0x5  ; @loc_700CD4+0xa
@@ -938,12 +949,12 @@ incbin 'apack.re32', 0xd1b, 0x1  ; @loc_700CFB+0x0
 dd aOutDat+0x0  ; @loc_700CFB+0x1
 call libcu_remove  ; @loc_700CFB+0x5
 incbin 'apack.re32', 0xd25, 0x4  ; @loc_700CFB+0xa
-call get_internal_error_code_ptr  ; @loc_700CFB+0xe
+call libcu_get_internal_error_code_ptr  ; @loc_700CFB+0xe
 incbin 'apack.re32', 0xd2e, 0xa  ; @loc_700CFB+0x13
 call prog_fatal_error  ; @loc_700CFB+0x1d
 loc_700D1D:  ; @_text+0xd1d
 incbin 'apack.re32', 0xd3d, 0x1  ; @loc_700D1D+0x0
-dd aOutDat_0+0x0  ; @loc_700D1D+0x1
+dd aOutDat+0x0  ; @loc_700D1D+0x1
 incbin 'apack.re32', 0xd42, 0x1  ; @loc_700D1D+0x5
 dd aApacktmp+0x0  ; @loc_700D1D+0x6
 incbin 'apack.re32', 0xd47, 0x5  ; @loc_700D1D+0xa
@@ -981,13 +992,15 @@ incbin 'apack.re32', 0xe98, 0x1b  ; @aAnUnknownError+0x0
 aApacktmp:  ; @_text+0xe93
 incbin 'apack.re32', 0xeb3, 0xd  ; @aApacktmp+0x0
 aSyntaxApackOpt:  ; @_text+0xea0
-incbin 'apack.re32', 0xec0, 0x1b5  ; @aSyntaxApackOpt+0x0
-db 'default; '  ; patch: extend help stating that -c is the default.
-incbin 'apack.re32', 0xec0+0x1b5, 0x264-0x1b5  ; @aSyntaxApackOpt+0x1b5
-aQBeQuiet:  ; @_text+0x1104
-incbin 'apack.re32', 0x1124, 0x13  ; @aQBeQuiet+0x0
-aNl:  ; @_text+0x1117
-incbin 'apack.re32', 0x1137, 0x2  ; @aNl+0x0
+		incbin 'apack.re32', 0xec0, 0x1b5  ; @aSyntaxApackOpt+0x0
+		db 'default; '  ; patch: extend help stating that -c is the default.
+		incbin 'apack.re32', 0xec0+0x1b5, 0x264-0x1b5-1  ; @aSyntaxApackOpt+0x1b5
+		db '    -r  (specify early) Simulate the registered version', 10
+		db '    -a  (specify early) Use temporary output file APACKTMP.$$$', 10
+		incbin 'apack.re32', 0x1124, 0x13-3  ; -q. @aQBeQuiet+0x0
+		db 10
+  aNoQuiet:  ; !! Remove code printing this.
+  aQBeQuiet:	db 0  ; !! Remove code printing this.
 aWelcomeHeader:  ; @_text+0x1119
 incbin 'apack.re32', 0x1139, 0x17f  ; @aWelcomeHeader+0x0
 aThisCopyOfApac:  ; @_text+0x1298
@@ -1031,20 +1044,14 @@ aNoOutputFileSp:  ; @_text+0x141e
 incbin 'apack.re32', 0x143e, 0x38  ; @aNoOutputFileSp+0x0
 aOutExe:  ; @_text+0x1456
 incbin 'apack.re32', 0x1476, 0x8  ; @aOutExe+0x0
-aOutExe_0:  ; @_text+0x145e
-incbin 'apack.re32', 0x147e, 0x8  ; @aOutExe_0+0x0
 aNoOutputFileSp_0:  ; @_text+0x1473
 incbin 'apack.re32', 0x1493, 0x38  ; @aNoOutputFileSp_0+0x0
 aOutCom:  ; @_text+0x14ab
 incbin 'apack.re32', 0x14cb, 0x8  ; @aOutCom+0x0
-aOutCom_0:  ; @_text+0x14b3
-incbin 'apack.re32', 0x14d3, 0x8  ; @aOutCom_0+0x0
 aNoOutputFileSp_1:  ; @_text+0x14c8
 incbin 'apack.re32', 0x14e8, 0x38  ; @aNoOutputFileSp_1+0x0
 aOutDat:  ; @_text+0x1500
 incbin 'apack.re32', 0x1520, 0x8  ; @aOutDat+0x0
-aOutDat_0:  ; @_text+0x1508
-incbin 'apack.re32', 0x1528, 0x8  ; @aOutDat_0+0x0
 aDoneCompressio:  ; @_text+0x151d
 incbin 'apack.re32', 0x153d, 0x23  ; @aDoneCompressio+0x0
 aLuBytesLuBytes:  ; @_text+0x1540
@@ -4299,16 +4306,16 @@ call_libcu_free  ; patch: Don't free.  ; @loc_70509A+0x0
 incbin 'apack.re32', 0x50bf, 0x5  ; @loc_70509A+0x5
 aAplibV026bApac:  ; @_text+0x50a4
 incbin 'apack.re32', 0x50c4, 0xb1  ; @aAplibV026bApac+0x0
-prog_sub_705155:  ; @_text+0x5155
-incbin 'apack.re32', 0x5175, 0xa  ; @prog_sub_705155+0x0
-dd count+0x0  ; @prog_sub_705155+0xa
-incbin 'apack.re32', 0x5183, 0x6  ; @prog_sub_705155+0xe
-dd dword_751E08+0x0  ; @prog_sub_705155+0x14
-incbin 'apack.re32', 0x518d, 0x2  ; @prog_sub_705155+0x18
-dd dword_751E0C+0x0  ; @prog_sub_705155+0x1a
-incbin 'apack.re32', 0x5193, 0x2  ; @prog_sub_705155+0x1e
-dd dword_751E10+0x0  ; @prog_sub_705155+0x20
-incbin 'apack.re32', 0x5199, 0xb  ; @prog_sub_705155+0x24
+prog_compress_dos_com:  ; @_text+0x5155
+incbin 'apack.re32', 0x5175, 0xa  ; @prog_compress_dos_com+0x0
+dd input_file_size+0x0  ; @prog_compress_dos_com+0xa
+incbin 'apack.re32', 0x5183, 0x6  ; @prog_compress_dos_com+0xe
+dd dword_751E08+0x0  ; @prog_compress_dos_com+0x14
+incbin 'apack.re32', 0x518d, 0x2  ; @prog_compress_dos_com+0x18
+dd dword_751E0C+0x0  ; @prog_compress_dos_com+0x1a
+incbin 'apack.re32', 0x5193, 0x2  ; @prog_compress_dos_com+0x1e
+dd dword_751E10+0x0  ; @prog_compress_dos_com+0x20
+incbin 'apack.re32', 0x5199, 0xb  ; @prog_compress_dos_com+0x24
 loc_705184:  ; @_text+0x5184
 incbin 'apack.re32', 0x51a4, 0x3  ; @loc_705184+0x0
 dd dword_711128+0x0  ; @loc_705184+0x3
@@ -4358,7 +4365,7 @@ incbin 'apack.re32', 0x524e, 0x3  ; @loc_70521A+0x14
 loc_705231:  ; @_text+0x5231
 incbin 'apack.re32', 0x5251, 0xb  ; @loc_705231+0x0
 dd aApacktmp+0x0  ; @loc_705231+0xb
-call libcu_open  ; @loc_705231+0xf
+call open_apacktmp  ; @loc_705231+0xf
 incbin 'apack.re32', 0x5265, 0x4  ; @loc_705231+0x14
 dd fd6+0x0  ; @loc_705231+0x18
 incbin 'apack.re32', 0x526d, 0xa  ; @loc_705231+0x1c
@@ -4380,7 +4387,7 @@ call libcu_printf  ; @loc_705275+0xe
 incbin 'apack.re32', 0x52a8, 0x3  ; @loc_705275+0x13
 loc_70528B:  ; @_text+0x528b
 incbin 'apack.re32', 0x52ab, 0x1  ; @loc_70528B+0x0
-dd count+0x0  ; @loc_70528B+0x1
+dd input_file_size+0x0  ; @loc_70528B+0x1
 incbin 'apack.re32', 0x52b0, 0x5  ; @loc_70528B+0x5
 call libcu_malloc  ; @loc_70528B+0xa
 incbin 'apack.re32', 0x52ba, 0x1  ; @loc_70528B+0xf
@@ -4399,13 +4406,13 @@ dd unknown_ptr1+0x0  ; @loc_7052B2+0x1a
 incbin 'apack.re32', 0x52f0, 0x8  ; @loc_7052B2+0x1e
 loc_7052D8:  ; @_text+0x52d8
 incbin 'apack.re32', 0x52f8, 0x1  ; @loc_7052D8+0x0
-dd fd5+0x0  ; @loc_7052D8+0x1
+dd input_file_fd+0x0  ; @loc_7052D8+0x1
 incbin 'apack.re32', 0x52fd, 0x4  ; @loc_7052D8+0x5
 call libcu_lseek  ; @loc_7052D8+0x9
 incbin 'apack.re32', 0x5306, 0x2  ; @loc_7052D8+0xe
 dd unknown_ptr2+0x0  ; @loc_7052D8+0x10
 incbin 'apack.re32', 0x530c, 0x1  ; @loc_7052D8+0x14
-dd fd5+0x0  ; @loc_7052D8+0x15
+dd input_file_fd+0x0  ; @loc_7052D8+0x15
 incbin 'apack.re32', 0x5311, 0x2  ; @loc_7052D8+0x19
 call libcu_read  ; @loc_7052D8+0x1b
 incbin 'apack.re32', 0x5318, 0xb  ; @loc_7052D8+0x20
@@ -5377,11 +5384,11 @@ loc_7063AE:  ; @_text+0x63ae
 incbin 'apack.re32', 0x63ce, 0x11  ; @loc_7063AE+0x0
 loc_7063BF:  ; @_text+0x63bf
 incbin 'apack.re32', 0x63df, 0x8  ; @loc_7063BF+0x0
-prog_sub_7063C7:  ; @_text+0x63c7
-incbin 'apack.re32', 0x63e7, 0x4a  ; @prog_sub_7063C7+0x0
-dd dword_751DEC+0x0  ; @prog_sub_7063C7+0x4a
-incbin 'apack.re32', 0x6435, 0xd  ; @prog_sub_7063C7+0x4e
-dd dword_751DDC+0x0  ; @prog_sub_7063C7+0x5b
+prog_compress_mz_exe:  ; @_text+0x63c7
+incbin 'apack.re32', 0x63e7, 0x4a  ; @prog_compress_mz_exe+0x0
+dd dword_751DEC+0x0  ; @prog_compress_mz_exe+0x4a
+incbin 'apack.re32', 0x6435, 0xd  ; @prog_compress_mz_exe+0x4e
+dd dword_751DDC+0x0  ; @prog_compress_mz_exe+0x5b
 loc_706426:  ; @_text+0x6426
 call prog_sub_700034  ; @loc_706426+0x0
 incbin 'apack.re32', 0x644b, 0xa  ; @loc_706426+0x5
@@ -5448,7 +5455,7 @@ loc_706553:  ; @_text+0x6553
 incbin 'apack.re32', 0x6573, 0x2  ; @loc_706553+0x0
 dd dword_751DD4+0x0  ; @loc_706553+0x2
 incbin 'apack.re32', 0x6579, 0x5  ; @loc_706553+0x6
-dd count+0x0  ; @loc_706553+0xb
+dd input_file_size+0x0  ; @loc_706553+0xb
 incbin 'apack.re32', 0x6582, 0x2  ; @loc_706553+0xf
 dd aTotalSizeLuByt+0x0  ; @loc_706553+0x11
 call libcu_printf  ; @loc_706553+0x15
@@ -5461,7 +5468,7 @@ incbin 'apack.re32', 0x65a6, 0x9  ; @loc_706553+0x33
 dd aCodeSizeLuByte_0+0x0  ; @loc_706553+0x3c
 call libcu_printf  ; @loc_706553+0x40
 incbin 'apack.re32', 0x65b8, 0x5  ; @loc_706553+0x45
-dd count+0x0  ; @loc_706553+0x4a
+dd input_file_size+0x0  ; @loc_706553+0x4a
 incbin 'apack.re32', 0x65c1, 0x10  ; @loc_706553+0x4e
 dd aExtraDataLuByt+0x0  ; @loc_706553+0x5e
 call libcu_printf  ; @loc_706553+0x62
@@ -5484,7 +5491,7 @@ incbin 'apack.re32', 0x660b, 0x1  ; @loc_7065D3+0x18
 loc_7065EC:  ; @_text+0x65ec
 incbin 'apack.re32', 0x660c, 0xb  ; @loc_7065EC+0x0
 dd aApacktmp+0x0  ; @loc_7065EC+0xb
-call libcu_open  ; @loc_7065EC+0xf
+call open_apacktmp  ; @loc_7065EC+0xf
 incbin 'apack.re32', 0x6620, 0x4  ; @loc_7065EC+0x14
 dd fd6+0x0  ; @loc_7065EC+0x18
 incbin 'apack.re32', 0x6628, 0xa  ; @loc_7065EC+0x1c
@@ -5500,7 +5507,7 @@ loc_70662D:  ; @_text+0x662d
 incbin 'apack.re32', 0x664d, 0x4  ; @loc_70662D+0x0
 dd word_711D16+0x0  ; @loc_70662D+0x4
 incbin 'apack.re32', 0x6655, 0x2  ; @loc_70662D+0x8
-dd count+0x0  ; @loc_70662D+0xa
+dd input_file_size+0x0  ; @loc_70662D+0xa
 incbin 'apack.re32', 0x665b, 0xe  ; @loc_70662D+0xe
 call libcu_malloc  ; @loc_70662D+0x1c
 incbin 'apack.re32', 0x666e, 0x1  ; @loc_70662D+0x21
@@ -5544,13 +5551,13 @@ loc_7066F8:  ; @_text+0x66f8
 incbin 'apack.re32', 0x6718, 0x4  ; @loc_7066F8+0x0
 dd word_711D18+0x0  ; @loc_7066F8+0x4
 incbin 'apack.re32', 0x6720, 0x5  ; @loc_7066F8+0x8
-dd fd5+0x0  ; @loc_7066F8+0xd
+dd input_file_fd+0x0  ; @loc_7066F8+0xd
 incbin 'apack.re32', 0x6729, 0x3  ; @loc_7066F8+0x11
 call libcu_lseek  ; @loc_7066F8+0x14
 incbin 'apack.re32', 0x6731, 0x6  ; @loc_7066F8+0x19
 dd unknown_ptr2+0x0  ; @loc_7066F8+0x1f
 incbin 'apack.re32', 0x673b, 0x1  ; @loc_7066F8+0x23
-dd fd5+0x0  ; @loc_7066F8+0x24
+dd input_file_fd+0x0  ; @loc_7066F8+0x24
 call libcu_read  ; @loc_7066F8+0x28
 incbin 'apack.re32', 0x6745, 0x2  ; @loc_7066F8+0x2d
 dd dword_751E04+0x0  ; @loc_7066F8+0x2f
@@ -5562,7 +5569,7 @@ loc_70673E:  ; @_text+0x673e
 incbin 'apack.re32', 0x675e, 0x3  ; @loc_70673E+0x0
 dd word_711D16+0x0  ; @loc_70673E+0x3
 incbin 'apack.re32', 0x6765, 0x8  ; @loc_70673E+0x7
-dd fd5+0x0  ; @loc_70673E+0xf
+dd input_file_fd+0x0  ; @loc_70673E+0xf
 incbin 'apack.re32', 0x6771, 0x7  ; @loc_70673E+0x13
 dd word_711D28+0x0  ; @loc_70673E+0x1a
 call libcu_lseek  ; @loc_70673E+0x1e
@@ -5571,7 +5578,7 @@ dd word_711D16+0x0  ; @loc_70673E+0x27
 incbin 'apack.re32', 0x6789, 0x2  ; @loc_70673E+0x2b
 dd unknown_ptr3+0x0  ; @loc_70673E+0x2d
 incbin 'apack.re32', 0x678f, 0x3  ; @loc_70673E+0x31
-dd fd5+0x0  ; @loc_70673E+0x34
+dd input_file_fd+0x0  ; @loc_70673E+0x34
 incbin 'apack.re32', 0x6796, 0x3  ; @loc_70673E+0x38
 call libcu_read  ; @loc_70673E+0x3b
 incbin 'apack.re32', 0x679e, 0x2  ; @loc_70673E+0x40
@@ -9364,7 +9371,7 @@ dd fd6+0x0  ; @loc_70A60C+0x1
 incbin 'apack.re32', 0xa631, 0x4  ; @loc_70A60C+0x5
 call libcu_lseek  ; @loc_70A60C+0x9
 incbin 'apack.re32', 0xa63a, 0x5  ; @loc_70A60C+0xe
-dd byte_711D10+0x0  ; @loc_70A60C+0x13
+dd input_file_header_buf+0x0  ; @loc_70A60C+0x13
 incbin 'apack.re32', 0xa643, 0x1  ; @loc_70A60C+0x17
 dd fd6+0x0  ; @loc_70A60C+0x18
 call libcu_write  ; @loc_70A60C+0x1c
@@ -9455,7 +9462,7 @@ incbin 'apack.re32', 0xa76f, 0x4  ; @loc_70A714+0x3b
 call libcu_write  ; @loc_70A714+0x3f
 loc_70A758:  ; @_text+0xa758
 incbin 'apack.re32', 0xa778, 0x6  ; @loc_70A758+0x0
-dd count+0x0  ; @loc_70A758+0x6
+dd input_file_size+0x0  ; @loc_70A758+0x6
 incbin 'apack.re32', 0xa782, 0xc  ; @loc_70A758+0xa
 dd skip_or_copy_char_dword+0x0  ; @loc_70A758+0x16
 db 0x90, 0x90  ; patch: Skip the comparison. ; @loc_70A758+0x1a
@@ -9468,15 +9475,15 @@ dd is_quiet+0x0  ; @loc_70A7AA+0xb
 incbin 'apack.re32', 0xa7d9, 0x7  ; @loc_70A7AA+0xf
 loc_70A7C0:  ; @_text+0xa7c0
 incbin 'apack.re32', 0xa7e0, 0x5  ; @loc_70A7C0+0x0
-dd fd5+0x0  ; @loc_70A7C0+0x5
+dd input_file_fd+0x0  ; @loc_70A7C0+0x5
 incbin 'apack.re32', 0xa7e9, 0x6  ; @loc_70A7C0+0x9
 call libcu_lseek  ; @loc_70A7C0+0xf
 incbin 'apack.re32', 0xa7f4, 0x2  ; @loc_70A7C0+0x14
-dd count+0x0  ; @loc_70A7C0+0x16
+dd input_file_size+0x0  ; @loc_70A7C0+0x16
 incbin 'apack.re32', 0xa7fa, 0x2  ; @loc_70A7C0+0x1a
 dd unknown_ptr2+0x0  ; @loc_70A7C0+0x1c
 incbin 'apack.re32', 0xa800, 0x1  ; @loc_70A7C0+0x20
-dd fd5+0x0  ; @loc_70A7C0+0x21
+dd input_file_fd+0x0  ; @loc_70A7C0+0x21
 incbin 'apack.re32', 0xa805, 0x2  ; @loc_70A7C0+0x25
 call libcu_read  ; @loc_70A7C0+0x27
 incbin 'apack.re32', 0xa80c, 0x2  ; @loc_70A7C0+0x2c
@@ -9486,7 +9493,7 @@ dd fd6+0x0  ; @loc_70A7C0+0x34
 incbin 'apack.re32', 0xa818, 0x4  ; @loc_70A7C0+0x38
 call libcu_write  ; @loc_70A7C0+0x3c
 incbin 'apack.re32', 0xa821, 0x2  ; @loc_70A7C0+0x41
-dd count+0x0  ; @loc_70A7C0+0x43
+dd input_file_size+0x0  ; @loc_70A7C0+0x43
 incbin 'apack.re32', 0xa827, 0x2  ; @loc_70A7C0+0x47
 loc_70A809:  ; @_text+0xa809
 incbin 'apack.re32', 0xa829, 0x7  ; @loc_70A809+0x0
@@ -9606,7 +9613,7 @@ dd fd6+0x0  ; @loc_70A9C7+0x1
 incbin 'apack.re32', 0xa9ec, 0x4  ; @loc_70A9C7+0x5
 call libcu_lseek  ; @loc_70A9C7+0x9
 incbin 'apack.re32', 0xa9f5, 0x5  ; @loc_70A9C7+0xe
-dd byte_711D10+0x0  ; @loc_70A9C7+0x13
+dd input_file_header_buf+0x0  ; @loc_70A9C7+0x13
 incbin 'apack.re32', 0xa9fe, 0x1  ; @loc_70A9C7+0x17
 dd fd6+0x0  ; @loc_70A9C7+0x18
 call libcu_write  ; @loc_70A9C7+0x1c
@@ -9886,7 +9893,7 @@ dd fd6+0x0  ; @loc_70ADEB+0x1
 incbin 'apack.re32', 0xae10, 0x4  ; @loc_70ADEB+0x5
 call libcu_lseek  ; @loc_70ADEB+0x9
 incbin 'apack.re32', 0xae19, 0x5  ; @loc_70ADEB+0xe
-dd byte_711D10+0x0  ; @loc_70ADEB+0x13
+dd input_file_header_buf+0x0  ; @loc_70ADEB+0x13
 incbin 'apack.re32', 0xae22, 0x1  ; @loc_70ADEB+0x17
 dd fd6+0x0  ; @loc_70ADEB+0x18
 call libcu_write  ; @loc_70ADEB+0x1c
@@ -9986,7 +9993,7 @@ incbin 'apack.re32', 0xaf6a, 0x2  ; @loc_70AF0F+0x3b
 call libcu_write  ; @loc_70AF0F+0x3d
 loc_70AF51:  ; @_text+0xaf51
 incbin 'apack.re32', 0xaf71, 0x6  ; @loc_70AF51+0x0
-dd count+0x0  ; @loc_70AF51+0x6
+dd input_file_size+0x0  ; @loc_70AF51+0x6
 incbin 'apack.re32', 0xaf7b, 0xc  ; @loc_70AF51+0xa
 dd skip_or_copy_char_dword+0x0  ; @loc_70AF51+0x16
 db 0x90, 0x90  ; patch: Skip the comparison.  ; @loc_70AF51+0x1a
@@ -9999,15 +10006,15 @@ dd is_quiet+0x0  ; @loc_70AFA3+0xb
 incbin 'apack.re32', 0xafd2, 0x7  ; @loc_70AFA3+0xf
 loc_70AFB9:  ; @_text+0xafb9
 incbin 'apack.re32', 0xafd9, 0x5  ; @loc_70AFB9+0x0
-dd fd5+0x0  ; @loc_70AFB9+0x5
+dd input_file_fd+0x0  ; @loc_70AFB9+0x5
 incbin 'apack.re32', 0xafe2, 0x2  ; @loc_70AFB9+0x9
 call libcu_lseek  ; @loc_70AFB9+0xb
 incbin 'apack.re32', 0xafe9, 0x2  ; @loc_70AFB9+0x10
-dd count+0x0  ; @loc_70AFB9+0x12
+dd input_file_size+0x0  ; @loc_70AFB9+0x12
 incbin 'apack.re32', 0xafef, 0x2  ; @loc_70AFB9+0x16
 dd unknown_ptr2+0x0  ; @loc_70AFB9+0x18
 incbin 'apack.re32', 0xaff5, 0x1  ; @loc_70AFB9+0x1c
-dd fd5+0x0  ; @loc_70AFB9+0x1d
+dd input_file_fd+0x0  ; @loc_70AFB9+0x1d
 incbin 'apack.re32', 0xaffa, 0x4  ; @loc_70AFB9+0x21
 call libcu_read  ; @loc_70AFB9+0x25
 incbin 'apack.re32', 0xb003, 0x2  ; @loc_70AFB9+0x2a
@@ -10017,7 +10024,7 @@ dd fd6+0x0  ; @loc_70AFB9+0x32
 incbin 'apack.re32', 0xb00f, 0x4  ; @loc_70AFB9+0x36
 call libcu_write  ; @loc_70AFB9+0x3a
 incbin 'apack.re32', 0xb018, 0x2  ; @loc_70AFB9+0x3f
-dd count+0x0  ; @loc_70AFB9+0x41
+dd input_file_size+0x0  ; @loc_70AFB9+0x41
 incbin 'apack.re32', 0xb01e, 0x4  ; @loc_70AFB9+0x45
 loc_70B002:  ; @_text+0xb002
 incbin 'apack.re32', 0xb022, 0x2  ; @loc_70B002+0x0
@@ -10504,7 +10511,7 @@ dd fd6+0x0  ; @loc_70B754+0x1
 incbin 'apack.re32', 0xb779, 0x4  ; @loc_70B754+0x5
 call libcu_lseek  ; @loc_70B754+0x9
 incbin 'apack.re32', 0xb782, 0x5  ; @loc_70B754+0xe
-dd byte_711D10+0x0  ; @loc_70B754+0x13
+dd input_file_header_buf+0x0  ; @loc_70B754+0x13
 incbin 'apack.re32', 0xb78b, 0x1  ; @loc_70B754+0x17
 dd fd6+0x0  ; @loc_70B754+0x18
 call libcu_write  ; @loc_70B754+0x1c
@@ -10611,7 +10618,7 @@ call libcu_printf  ; @loc_70B8BC+0xe
 incbin 'apack.re32', 0xb8ef, 0x3  ; @loc_70B8BC+0x13
 loc_70B8D2:  ; @_text+0xb8d2
 incbin 'apack.re32', 0xb8f2, 0x6  ; @loc_70B8D2+0x0
-dd count+0x0  ; @loc_70B8D2+0x6
+dd input_file_size+0x0  ; @loc_70B8D2+0x6
 incbin 'apack.re32', 0xb8fc, 0xc  ; @loc_70B8D2+0xa
 dd skip_or_copy_char_dword+0x0  ; @loc_70B8D2+0x16
 db 0x90, 0x90  ; patch: Skip the comparison.  ; @loc_70B8D2+0x1a
@@ -10624,15 +10631,15 @@ dd is_quiet+0x0  ; @loc_70B924+0xb
 incbin 'apack.re32', 0xb953, 0x7  ; @loc_70B924+0xf
 loc_70B93A:  ; @_text+0xb93a
 incbin 'apack.re32', 0xb95a, 0x5  ; @loc_70B93A+0x0
-dd fd5+0x0  ; @loc_70B93A+0x5
+dd input_file_fd+0x0  ; @loc_70B93A+0x5
 incbin 'apack.re32', 0xb963, 0x6  ; @loc_70B93A+0x9
 call libcu_lseek  ; @loc_70B93A+0xf
 incbin 'apack.re32', 0xb96e, 0x2  ; @loc_70B93A+0x14
-dd count+0x0  ; @loc_70B93A+0x16
+dd input_file_size+0x0  ; @loc_70B93A+0x16
 incbin 'apack.re32', 0xb974, 0x2  ; @loc_70B93A+0x1a
 dd unknown_ptr2+0x0  ; @loc_70B93A+0x1c
 incbin 'apack.re32', 0xb97a, 0x1  ; @loc_70B93A+0x20
-dd fd5+0x0  ; @loc_70B93A+0x21
+dd input_file_fd+0x0  ; @loc_70B93A+0x21
 incbin 'apack.re32', 0xb97f, 0x2  ; @loc_70B93A+0x25
 call libcu_read  ; @loc_70B93A+0x27
 incbin 'apack.re32', 0xb986, 0x2  ; @loc_70B93A+0x2c
@@ -10642,7 +10649,7 @@ dd fd6+0x0  ; @loc_70B93A+0x34
 incbin 'apack.re32', 0xb992, 0x4  ; @loc_70B93A+0x38
 call libcu_write  ; @loc_70B93A+0x3c
 incbin 'apack.re32', 0xb99b, 0x2  ; @loc_70B93A+0x41
-dd count+0x0  ; @loc_70B93A+0x43
+dd input_file_size+0x0  ; @loc_70B93A+0x43
 incbin 'apack.re32', 0xb9a1, 0x2  ; @loc_70B93A+0x47
 loc_70B983:  ; @_text+0xb983
 incbin 'apack.re32', 0xb9a3, 0xa  ; @loc_70B983+0x0
@@ -10916,8 +10923,8 @@ aCompiledOnJun1:  ; @_data+0x10
 incbin 'apack.re32', 0x11030, 0x30  ; @aCompiledOnJun1+0x0
 program_name_ptr:  ; @_data+0x110
 dd aApackV100+0x0  ; @program_name_ptr+0x0
-fd5:  ; @_data+0x118
-incbin 'apack.re32', 0x11138, 0x4  ; @fd5+0x0
+input_file_fd:  ; @_data+0x118
+incbin 'apack.re32', 0x11138, 0x4  ; @input_file_fd+0x0
 fd6:  ; @_data+0x11c
 incbin 'apack.re32', 0x1113c, 0x4  ; @fd6+0x0
 asc_711120:  ; @_data+0x120
@@ -11293,11 +11300,12 @@ incbin 'apack.re32', 0x119dc, 0x4  ; @dword_7119BC+0x0
 ; @_data+0x9c0
 
 section _BSS  ; Based on code generated by re2nasm.pl from aPACK 1.00 apack.exe.
-mylibc_internal_error_code: resb 4  ; @_bss+0x0
-resb 0x3  ; @_bss+0x4
+fake_internal_error_code: resb 4  ; @_bss+0x0
+do_use_apacktmp: resb 1  ; @_bss+0x4
+resb 0x2  ; @_bss+0x5
 byte_711D0F:  ; @_bss+0x7
 resb 0x1  ; @byte_711D0F+0x0
-byte_711D10:  ; @_bss+0x8
+input_file_header_buf:  ; @_bss+0x8
 resb 0x1  ; @byte_711D10+0x0
 byte_711D11:  ; @_bss+0x9
 resb 0x1  ; @byte_711D11+0x0
@@ -11337,8 +11345,8 @@ byte_711D90:  ; @_bss+0x88
 resb 0x1  ; @byte_711D90+0x0
 byte_711D91:  ; @_bss+0x89
 resb 0x3  ; @byte_711D91+0x0
-count:  ; @_bss+0x8c
-resb 0x4  ; @count+0x0
+input_file_size:  ; @_bss+0x8c
+resb 0x4  ; @input_file_size+0x0
 dword_711D98:  ; @_bss+0x90
 resb 0x4  ; @dword_711D98+0x0
 dword_711D9C:  ; @_bss+0x94
@@ -11389,8 +11397,8 @@ is_quiet:  ; @_bss+0x400e8
 resb 0x4  ; @is_quiet+0x0
 skip_or_copy_char_dword:  ; @_bss+0x400ec
 resb 0x4  ; @skip_or_copy_char_dword+0x0
-dword_751DF8:  ; @_bss+0x400f0
-resb 0x4  ; @dword_751DF8+0x0
+is_not_exe_dword:  ; @_bss+0x400f0
+resb 0x4  ; @is_not_exe_dword+0x0
 dword_751DFC:  ; @_bss+0x400f4
 resb 0x4  ; @dword_751DFC+0x0
 dword_751E00:  ; @_bss+0x400f8
@@ -11479,12 +11487,93 @@ byte_752672:  ; @_bss+0x4096a
 resb 0x36  ; @byte_752672+0x0
 ; @_bss+0x409a0
 
+; --- Patch code.
+
+section _TEXT
+
+save_output_filename:  ; Called only if output filename is explicitly specified. Inputs: dword [ESI+EDI*4]: pointer to output filename. Must exit by jumping to loc_70038E.
+		push edi  ; Save.
+		mov edi, [esi+edi*4]
+		cmp byte [do_use_apacktmp], 0
+		jne short .done
+		mov [saved_output_filename_ptr], edi
+.done:		pop edi  ; Restore.
+		jmp strict near loc_70038E
+
+open_input_file:  ; Inputs: (pathname == input_filename, flags, mode == (O_BINARY|O_RDONLY)) on the stack.
+		; If the specified input_filename is the same string value
+		; as the output filename (target of
+		; saved_output_filename_ptr), then set
+		; saved_output_filename_ptr to NULL, thus force use of
+		; apacktmp. That's because the aPACK compressor algorithm is
+		; not safe to use on the same file opened for both reading
+		; and writing.
+		push esi  ; Save.
+		push edi  ; Save.
+		push eax  ; Save.
+		mov edi, [saved_output_filename_ptr]
+		test edi, edi
+		jz short .done_cmp
+		mov esi, [esp+4*4]  ; input_filename.
+.next_char:	lodsb
+		scasb
+		jne short .done_cmp
+		cmp al, 0
+		jne short .next_char
+.equal:		xor eax, eax
+		mov [saved_output_filename_ptr], eax  ; Set it to NULL, force use of apacktmp.
+		jmp short .done_cmp
+.done_cmp:	pop eax  ; Restore.
+		pop edi  ; Restore.
+		pop esi  ; Restore.
+		jmp strict near libcu_open
+
+open_apacktmp:  ; Inputs: (pathname == aApacktmp, flags, mode == (O_BINARY|O_TRUNC|O_CREAT|O_WRONLY)) on the stack.
+		mov eax, [saved_output_filename_ptr]  ; We can ruin it before jumping to libcu_open.
+		test eax, eax
+		jz short .cont
+		mov [esp+4], eax  ; Override aApacktmp with saved_output_filename_ptr. The caller of open_apacktmp will ignore this change, but libcu_open below will open the output file instead.
+		;push eax
+		;push dword aSHttpWwwIbsens
+		;call libcu_printf  ; For debugging.
+		;times 2 pop eax  ; Clean up arguments of libcu_printf above.
+.cont:		jmp strict near libcu_open
+
+
+remove_apacktmp:  ; Inputs: EAX: aApacktmp.
+		push edx  ; Save.
+		mov edx, [saved_output_filename_ptr]
+		test edx, edx
+		jz short .cont
+		xchg eax, edx  ; EAX (filename libcu_remove below should remove) := EDX (saved_output_filename_ptr); EDX := junk.
+.cont:		pop edx  ; Restore.
+j_libcu_remove:	jmp strict near libcu_remove
+
+maybe_remove_output_file:  ; Inputs: EAX: pointer to output filename.
+		cmp [saved_output_filename_ptr], byte 0
+		je .cont
+		xor eax, eax  ; Simulate a successful libcu_remove.
+		ret  ; Don't actually remove anything, this is our final output file.
+.cont:		jmp short j_libcu_remove
+
+rename_from_apacktmp:  ; Inputs: EAX: aApackTmp; EDX: actual output filename (which may be explicitly specified or autogenerated, e.g. aOutCom, aOutExe, aOutDat).
+		cmp [saved_output_filename_ptr], byte 0
+		je .cont
+		xor eax, eax  ; Simulate a successful libcu_rename.
+		ret  ; Don't actually rename anything.
+.cont:		jmp strict near libcu_rename
+
+section _BSS
+saved_output_filename_ptr: resb 4
+		resb ($$-$)&3  ; Align to 4.
+section _TEXT
+
 ; --- libc shims.
 
 section _TEXT
 
-get_internal_error_code_ptr:  ; !! Inline or refactor this.
-		mov eax, mylibc_internal_error_code  ; Value is 0. Shouldn't be 6 (which the caller considers fatal after remove(3)).
+libcu_get_internal_error_code_ptr:  ; !! Inline or refactor this.
+		mov eax, fake_internal_error_code  ; Value is 0. Shouldn't be 6 (which the caller considers fatal after remove(3)).
 		ret
 
 %if 1  ; %ifndef T_DOS32  ; !! Write better shims for T_WIN32 and T_LI3. Do we even want this?

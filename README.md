@@ -258,10 +258,25 @@ executable files with relocations. Again, all these *nasm* and *wlink*
 invocations have been automated, and full command lines are in
 [compile.sh](compile.sh).
 
-## Possible future work
+Additional changes have been made, such as:
 
-* Make it reentrant in the same directory by making it choose a different
-  temporary filename (rather than *APACKTMP.$$$*) for each invocation.
+* Disabling the abort-by-pressing-Esc functionality.
+
+* Disabling the interactive *\[c\]opy or \[s\]kip* prompt, by making *-c*
+  (copy) the default. This has made apack1p noninteractive and
+  fully command-line-driven.
+
+* Adding the *-r* command-line flag to simulate the registered version. There
+  is a difference between the binary output bytes.
+
+* Enabling the *-q* command-line flag not only for the registered version.
+
+* Adding the *-a* command-line flag to enable creating the temporary file
+  (*APACKTMP.$$$*). (Previously it was the default.) This has made execution
+  of multiple apack1p processes in the same directory reentrant (i.e. not
+  disturbing each other).
+
+## Possible future work
 
 * Add back the output file timestamping functionality.
 
