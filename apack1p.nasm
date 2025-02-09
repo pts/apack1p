@@ -38,6 +38,7 @@
 ; * !! get rid of OpenWatcom libc library apackdos.lib functions: close_ remove_ exit_ open_ lseek_ filelength_ read_ rename_ malloc_ write_
 ; * !! get rid of wlink(1), generate Win32 executable with NASM only; this will be tricky without PE .reloc generation support in NASM; but we can use the decimg.nasm trick
 ; * !! @0x413 cmp bl, '/' ; !! TODO(pts): Does this prevent using of absolute filenames on Linux?
+; * !! separate .text from .data, create 2 output sections
 ; * later: port it to FreeBSD i386 and other i386 on other popular BSDs
 ; * later: port it to macOS i386. The last release of macOS which supports i386 (*32-bit apps*) is macOS 10.14 Mojave released on 2018-09-24.
 ; * write a (limited) lightweight i386 emulator in ANSI C, and run it the emulator.
