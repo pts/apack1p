@@ -12337,22 +12337,23 @@ libcu_read:  ; Inputs: EAX: arg1; EDX: arg2; EBX: arg3. Outputs: result in EAX.
 		jmp short read_write_helper
 
 libcu_close:  ; Inputs: EAX: arg1. Outputs: result in EAX. Outputs: result in EAX.
-		cmp eax, byte 5
-		jnc short .bad
 		push ecx  ; Save.
 		push edx  ; Save.
+		xor edx, edx
+		cmp eax, byte 5
+		jnc short .bad
 		xor ecx, ecx
 		xchg ecx, [fd_handles+eax*4]
 		push ecx  ; Old handle.
 		call _CloseHandle@4  ; Ruins EAX, EDX and ECX.
-.after:		pop edx  ; Restore.
-		pop ecx  ; Restore.
+.after:		xor edx, edx  ; Will return 0 on success.
 		test eax, eax
-		jz short .bad
-		xor eax, eax
-		jmp short .ret
-.bad:		or eax, byte -1
-.ret:		ret
+		jnz short .ok
+.bad:		dec edx  ; Will return -1 on failure.
+.ok:		xchg eax, edx  ; EAX := EDX (result); EDX := junk.
+		pop edx  ; Restore.
+		pop ecx  ; Restore.
+		ret
 
 libcu_remove:  ; Inputs: EAX: arg1. Outputs: result in EAX. Outputs: result in EAX.
 		push ecx  ; Save.
