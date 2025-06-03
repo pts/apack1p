@@ -453,9 +453,9 @@ incbin 'apack.re32', 0x50a, 0x2  ; @loc_7004EA+0x0
 dd dword_751DEC+0x0  ; @loc_7004EA+0x2
 incbin 'apack.re32', 0x510, 0x9  ; @loc_7004EA+0x6
 loc_7004F9:  ; @_text+0x4f9
-incbin 'apack.re32', 0x519, 0x2  ; @loc_7004F9+0x0
-dd is_quiet+0x0  ; @loc_7004F9+0x2
-incbin 'apack.re32', 0x51f, 0x9  ; @loc_7004F9+0x6
+inc dword [is_quiet]  ; patch: Recognize specifying `-q' multiple times.  ; @loc_7004F9+0x2
+times 4 nop
+incbin 'apack.re32', 0x523, 0x5  ; @loc_7004F9+0x6
 loc_700508:  ; @_text+0x508
 incbin 'apack.re32', 0x528, 0x2  ; @loc_700508+0x0
 dd skip_or_copy_char_dword+0x0  ; @loc_700508+0x2
@@ -522,14 +522,20 @@ incbin 'apack.re32', 0x6e7, 0x5  ; @loc_7006A1+0x26
 loc_7006CC:  ; @_text+0x6cc
 incbin 'apack.re32', 0x6ec, 0x9  ; @loc_7006CC+0x0
 loc_7006D5:  ; @_text+0x6d5
-
 incbin 'apack.re32', 0x6f5, 0xb  ; @loc_7006D5+0x0
-times 0xd nop ; patch: Only check is_quiet here (not is_registered).  ; @loc_7006D5+0xb
-incbin 'apack.re32', 0x70d, 2  ; @loc_7006D5+0x18
 
-dd is_quiet+0x0  ; @loc_7006D5+0x1a
-incbin 'apack.re32', 0x713, 0x8  ; @loc_7006D5+0x1e
+at_7006E0:  ; @_text+0x6e0
+; patch: Only check is_quiet here (not is_registered), and skip printing if is_quiet >= 2.  ; @loc_7006D5+0xb
+; patched logic: if ((unsigned)is_quiet >= 2) goto loc_70070D; if (is_quiet) goto loc_700887;
+cmp dword [is_quiet], byte 2
+jae short loc_70070D
+cmp dword [is_quiet], byte 0
+je strict near loc_700887
+times 0x6fa-0x6e0-($-at_7006E0) nop
+at_7006FA:  ; @_text+0x6FA
+incbin 'apack.re32', 0x71a, 1  ; @loc_7006D5+0x1e+7
 dd program_name_ptr+0x0  ; @loc_7006D5+0x26
+
 incbin 'apack.re32', 0x71f, 0x2  ; @loc_7006D5+0x2a
 dd aSHttpWwwIbsens+0x0  ; @loc_7006D5+0x2c
 call libcu_printf  ; @loc_7006D5+0x30
