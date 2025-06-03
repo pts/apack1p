@@ -854,16 +854,22 @@ loc_700B7D:  ; @_text+0xb7d
 call rename_from_apacktmp  ; @loc_700B7D+0x0
 incbin 'apack.re32', 0xba2, 0x9  ; @loc_700B7D+0x5
 call prog_fatal_error  ; @loc_700B7D+0xe
+
 loc_700B90:  ; @_text+0xb90
-incbin 'apack.re32', 0xbb0, 0x2  ; @loc_700B90+0x0
-dd dword_711D98+0x0  ; @loc_700B90+0x2
-incbin 'apack.re32', 0xbb6, 0x13  ; @loc_700B90+0x6
-dd input_file_size+0x0  ; @loc_700B90+0x19
+; patch: print final total only if is_quiet < 2
+cmp word [is_quiet], byte 2
+jae short at_700BDD
+mov eax, [output_file_size]
+imul eax, byte 100  ; Multiplication with imul needs fewer bytes than the shl-based code in the original. We need the extra bytes for the `cmp' above.
+xor edx, edx
+div dword [input_file_size]
+times 0xbad-0xb90-($-loc_700B90) nop
+at_700BAD:  ; @_text+0xbad
 incbin 'apack.re32', 0xbcd, 0x9  ; @loc_700B90+0x1d
 dd aDoneCompressio+0x0  ; @loc_700B90+0x26
 call libcu_printf  ; @loc_700B90+0x2a
 incbin 'apack.re32', 0xbdf, 0x5  ; @loc_700B90+0x2f
-dd dword_711D98+0x0  ; @loc_700B90+0x34
+dd output_file_size+0x0  ; @loc_700B90+0x34
 incbin 'apack.re32', 0xbe8, 0x3  ; @loc_700B90+0x38
 dd input_file_size+0x0  ; @loc_700B90+0x3b
 incbin 'apack.re32', 0xbef, 0x2  ; @loc_700B90+0x3f
@@ -871,6 +877,7 @@ dd aLuBytesLuBytes+0x0  ; @loc_700B90+0x41
 call libcu_printf  ; @loc_700B90+0x45
 
 incbin 'apack.re32', 0xbfa, 0x3  ; @loc_700B90+0x4a
+at_700BDD:  ; @_text+0xbad
 times 0xbeb-0xbdd nop  ; patch: Ignore `int 10h' video changes.
 incbin 'apack.re32', 0xc0b, 0xbf2-0xbeb
 
@@ -4975,7 +4982,7 @@ incbin 'apack.re32', 0x5bd8, 0x1  ; @loc_705BB3+0x5
 dd fd6+0x0  ; @loc_705BB3+0x6
 call libcu_filelength  ; @loc_705BB3+0xa
 incbin 'apack.re32', 0x5be2, 0x1  ; @loc_705BB3+0xf
-dd dword_711D98+0x0  ; @loc_705BB3+0x10
+dd output_file_size+0x0  ; @loc_705BB3+0x10
 incbin 'apack.re32', 0x5be7, 0xa  ; @loc_705BB3+0x14
 loc_705BD1:  ; @_text+0x5bd1
 incbin 'apack.re32', 0x5bf1, 0x2  ; @loc_705BD1+0x0
@@ -9533,7 +9540,7 @@ incbin 'apack.re32', 0xa894, 0x1  ; @loc_70A867+0xd
 dd fd6+0x0  ; @loc_70A867+0xe
 call libcu_filelength  ; @loc_70A867+0x12
 incbin 'apack.re32', 0xa89e, 0x1  ; @loc_70A867+0x17
-dd dword_711D98+0x0  ; @loc_70A867+0x18
+dd output_file_size+0x0  ; @loc_70A867+0x18
 incbin 'apack.re32', 0xa8a3, 0x2  ; @loc_70A867+0x1c
 call prog_sub_700010  ; @loc_70A867+0x1e
 incbin 'apack.re32', 0xa8aa, 0x2  ; @loc_70A867+0x23
@@ -10070,11 +10077,11 @@ incbin 'apack.re32', 0xb0b3, 0x3  ; @loc_70B078+0x1b
 dd word_711D24+0x0  ; @loc_70B078+0x1e
 call libcu_filelength  ; @loc_70B078+0x22
 incbin 'apack.re32', 0xb0bf, 0x1  ; @loc_70B078+0x27
-dd dword_711D98+0x0  ; @loc_70B078+0x28
+dd output_file_size+0x0  ; @loc_70B078+0x28
 incbin 'apack.re32', 0xb0c4, 0x2  ; @loc_70B078+0x2c
 call prog_sub_700010  ; @loc_70B078+0x2e
 incbin 'apack.re32', 0xb0cb, 0x4  ; @loc_70B078+0x33
-dd dword_711D98+0x0  ; @loc_70B078+0x37
+dd output_file_size+0x0  ; @loc_70B078+0x37
 incbin 'apack.re32', 0xb0d3, 0x2  ; @loc_70B078+0x3b
 dd word_711D18+0x0  ; @loc_70B078+0x3d
 incbin 'apack.re32', 0xb0d9, 0xf  ; @loc_70B078+0x41
@@ -10691,11 +10698,11 @@ incbin 'apack.re32', 0xba37, 0x1  ; @loc_70BA0A+0xd
 dd fd6+0x0  ; @loc_70BA0A+0xe
 call libcu_filelength  ; @loc_70BA0A+0x12
 incbin 'apack.re32', 0xba41, 0x1  ; @loc_70BA0A+0x17
-dd dword_711D98+0x0  ; @loc_70BA0A+0x18
+dd output_file_size+0x0  ; @loc_70BA0A+0x18
 incbin 'apack.re32', 0xba46, 0x2  ; @loc_70BA0A+0x1c
 call prog_sub_700010  ; @loc_70BA0A+0x1e
 incbin 'apack.re32', 0xba4d, 0x4  ; @loc_70BA0A+0x23
-dd dword_711D98+0x0  ; @loc_70BA0A+0x27
+dd output_file_size+0x0  ; @loc_70BA0A+0x27
 incbin 'apack.re32', 0xba55, 0x2  ; @loc_70BA0A+0x2b
 dd word_711D18+0x0  ; @loc_70BA0A+0x2d
 incbin 'apack.re32', 0xba5b, 0xc  ; @loc_70BA0A+0x31
@@ -11355,8 +11362,8 @@ byte_711D91:  ; @_bss+0x89
 resb 0x3  ; @byte_711D91+0x0
 input_file_size:  ; @_bss+0x8c
 resb 0x4  ; @input_file_size+0x0
-dword_711D98:  ; @_bss+0x90
-resb 0x4  ; @dword_711D98+0x0
+output_file_size:  ; @_bss+0x90
+resb 0x4  ; @output_file_size+0x0
 dword_711D9C:  ; @_bss+0x94
 resb 0x4  ; @dword_711D9C+0x0
 unknown_ptr1:  ; @_bss+0x98
