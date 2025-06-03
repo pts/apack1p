@@ -397,7 +397,8 @@ incbin 'apack.re32', 0x42c, 0x1  ; @loc_70040C+0x0
 dd aNoQuiet+0x0  ; @loc_70040C+0x1
 incbin 'apack.re32', 0x431, 0x2  ; @loc_70040C+0x5
 loc_700413:  ; @_text+0x413
-incbin 'apack.re32', 0x433, 0x23  ; @loc_700413+0x0
+times 9 nop  ; patch: replace 9 bytes with nop, to prevent '/' from being recognized as a flag (switch) character. This fixes the bug of not recognizing absolute filenames on Linux.
+incbin 'apack.re32', 0x43c, 0x1a  ; @loc_700413+0x8
 jmp strict near save_output_filename  ; patch: Save output filename for later use.  ; @loc_700413+0x23
 loc_70043B:  ; @_text+0x43b
 incbin 'apack.re32', 0x45b, 0x2  ; @loc_70043B+0x0
