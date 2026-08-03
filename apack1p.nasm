@@ -4555,7 +4555,9 @@ incbin 'apack.re32', 0x55d5, 0x38  ; @loc_7055B5+0x0
 loc_7055ED:  ; @_text+0x55ed
 incbin 'apack.re32', 0x560d, 0x1  ; @loc_7055ED+0x0
 dd byte_7525CF+0x0  ; @loc_7055ED+0x1
-incbin 'apack.re32', 0x5612, 0x8  ; @loc_7055ED+0x5
+incbin 'apack.re32', 0x5612, 0x4  ; @loc_7055ED+0x5
+db 0xeb  ; @loc_7055ED+0x9  . Change jz to `jmp short'
+incbin 'apack.re32', 0x5617, 0x3  ; @loc_7055ED+0xa
 dd is_registered+0x0  ; @loc_7055ED+0xd
 incbin 'apack.re32', 0x561e, 0x10  ; @loc_7055ED+0x11
 dd unknown_ptr2+0x0  ; @loc_7055ED+0x21
@@ -6066,7 +6068,9 @@ incbin 'apack.re32', 0x72ca, 0x4  ; @loc_707292+0x18
 loc_7072AE:  ; @_text+0x72ae
 incbin 'apack.re32', 0x72ce, 0x1  ; @loc_7072AE+0x0
 dd byte_752672+0x0  ; @loc_7072AE+0x1
-incbin 'apack.re32', 0x72d3, 0x8  ; @loc_7072AE+0x5
+incbin 'apack.re32', 0x72d3, 0x4  ; @loc_7072AE+0x5
+db 0xeb  ; @loc_7072AE+0x9  . Change jz to `jmp short'.
+incbin 'apack.re32', 0x72d8, 0x3  ; @loc_7072AE+0xa
 dd is_registered+0x0  ; @loc_7072AE+0xd
 incbin 'apack.re32', 0x72df, 0x12  ; @loc_7072AE+0x11
 dd unknown_ptr2+0x0  ; @loc_7072AE+0x23
@@ -6317,7 +6321,9 @@ incbin 'apack.re32', 0x7a90, 0x3  ; @loc_707A43+0x2d
 loc_707A73:  ; @_text+0x7a73
 incbin 'apack.re32', 0x7a93, 0x1  ; @loc_707A73+0x0
 dd byte_7525CF+0x0  ; @loc_707A73+0x1
-incbin 'apack.re32', 0x7a98, 0x8  ; @loc_707A73+0x5
+incbin 'apack.re32', 0x7a98, 0x4  ; @loc_707A73+0x5
+db 0xeb  ; @loc_707A73+0x9  . Change jz to `jmp short'.
+incbin 'apack.re32', 0x7a9d, 0x3  ; @loc_707A73+0xa
 dd is_registered+0x0  ; @loc_707A73+0xd
 incbin 'apack.re32', 0x7aa4, 0x12  ; @loc_707A73+0x11
 dd unknown_ptr2+0x0  ; @loc_707A73+0x23
@@ -9109,7 +9115,9 @@ dd dword_7119A8+0x0  ; @loc_70A1F5+0x13
 loc_70A20C:  ; @_text+0xa20c
 incbin 'apack.re32', 0xa22c, 0x2  ; @loc_70A20C+0x0
 dd byte_752547+0x0  ; @loc_70A20C+0x2
-incbin 'apack.re32', 0xa232, 0x5  ; @loc_70A20C+0x6
+incbin 'apack.re32', 0xa232, 0x1  ; @loc_70A20C+0x6
+db 0xeb  ; @loc_70A20C+0x7  . Change jz to `jmp short'.
+incbin 'apack.re32', 0xa234, 0x3  ; @loc_70A20C+0x8
 dd is_registered+0x0  ; @loc_70A20C+0xb
 incbin 'apack.re32', 0xa23b, 0x5  ; @loc_70A20C+0xf
 dd dword_711DA8+0x0  ; @loc_70A20C+0x14
